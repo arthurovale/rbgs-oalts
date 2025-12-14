@@ -52,4 +52,3 @@ models/oalts/Sig.v
 models/oalts/TimeFunctor.v
 models/oalts/TimeDownset.v
 models/oalts/Alts.v
-models/oalts/examples/Counter.v
