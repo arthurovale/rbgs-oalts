@@ -476,9 +476,9 @@ Module DCPOLCoalgTheory
 
 End DCPOLCoalgTheory.
 
-Module Type DCPOLCoalg
+Module DCPOLCoalg
   (L : DCPOCategoryDefinition) (S : DCPOCategoryDefinition)
-  (F : DCPOBifunctorDefinition L S S).
+  (F : DCPOBifunctorDefinition L S S) <: Category.
   Include DCPOLCoalgDefinition L S F.
   Include DCPOLCoalgTheory L S F.
 End DCPOLCoalg.
