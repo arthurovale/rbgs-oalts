@@ -3,7 +3,6 @@ Require Import interfaces.ConcreteCategory.
 Require Import interfaces.Functor.
 Require Import interfaces.MonoidalCategory.
 Require Import interfaces.Monads.
-Require Import interfaces.Limits.
 Require Import interfaces.LiftMonad.
 Require Import models.DCPO.
 Require Import models.PosetBicartesian.
