@@ -25,10 +25,6 @@ Require Import models.oalts.interfaces.LiftToKleisli.
       λ(α, D) = {(α', s) | α' ≤ α ∧ s ∈ D}
 *)
 
-(** ** Setup: Extract Terminals from Poset's Cartesian Structure *)
-
-Module PosetTerminals := TerminalsFromCartesian PosetBicartesian.C.
-
 (** ** Async Events on Poset *)
 
 Module PosetAsyncEvents := AsyncEventsDefinition PosetBicartesian PosetTerminals.

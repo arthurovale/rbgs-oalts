@@ -2,6 +2,7 @@ Require Import interfaces.Category.
 Require Import interfaces.ConcreteCategory.
 Require Import interfaces.Functor.
 Require Import interfaces.MonoidalCategory.
+Require Import interfaces.Limits.
 Require Import models.DCPO.
 Require Import coqrel.LogicalRelations.
 
@@ -241,3 +242,7 @@ Module PosetBicartesian <: BicartesianCategory.
   Include C.
   Include CC.
 End PosetBicartesian.
+
+(** ** Setup: Extract Terminals from Poset's Cartesian Structure *)
+
+Module PosetTerminals := TerminalsFromCartesian PosetBicartesian.C.
