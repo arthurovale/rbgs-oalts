@@ -2,7 +2,11 @@ Require Import interfaces.Category.
 Require Import interfaces.Functor.
 Require Import interfaces.MonoidalCategory.
 Require Import interfaces.Limits.
+Require Import models.PosetBicartesian.
 Require Import models.oalts.AsyncEvent.
+Require Import models.oalts.TimeDownset.
+Require Import models.oalts.Alts.
+Require Import models.oalts.DownsetMonad.
 
 (** * Polarized Signatures *)
 
@@ -284,6 +288,66 @@ Module SigBaseCocartesian (C : CocartesianCategory) (S : SigBase C) <: Cocartesi
   Include CocartesianTheory S.
 End SigBaseCocartesian.
 
+(** ** With some work we can also derive a cartesian structure to [SigBase C]
+    Note: We need C to have both products and coproducts since:
+    - The morphism definition uses coproducts (SigBase is built on CocartesianCategory)
+    - The cartesian structure requires products *)
+Module SigBaseCartesian (C : BicartesianCategory) (S : SigBase C) <: CartesianCategory.
+  Include S.
+  Import C.
+  Open Scope obj_scope.
+
+  Module Prod <: CartesianStructure S.
+    Import S.
+    Local Infix "@" := C.compose (at level 45, right associativity) : hom_scope.
+
+    (** Terminal object: (1, 1) *)
+    Definition unit : S.t := (C.Prod.unit, C.Prod.unit).
+
+    Definition ter : forall X, S.m X unit :=
+      fun X => C.Plus.copair (C.Plus.i1 @ C.Prod.ter (fst X)) (C.Plus.i2 @ C.Prod.ter (snd X)).
+
+    Proposition ter_uni : forall {X} (x y : S.m X unit), x = y.
+    Admitted.
+
+    (** Binary products: (A1, A2) × (B1, B2) = (A1 × B1, A2 × B2) *)
+    Definition omap (A B : S.t) : S.t :=
+      (C.Prod.omap (fst A) (fst B), C.Prod.omap (snd A) (snd B)).
+
+    Definition p1 : forall {A B : S.t}, S.m (omap A B) A :=
+      fun A B => C.Prod.p1 + C.Prod.p1.
+
+    Definition p2 : forall {A B : S.t}, S.m (omap A B) B :=
+      fun A B => C.Prod.p2 + C.Prod.p2.
+
+    (** The interchange isomorphism swaps products and coproducts *)
+    Definition interchange (A1 B1 A2 B2 : C.t) : C.iso (C.Prod.omap (A1 + A2) (B1 + B2)) ((C.Prod.omap A1 B1) + (C.Prod.omap A2 B2)).
+    Admitted.
+
+    Definition pair : forall {X A B : S.t}, S.m X A -> S.m X B -> S.m X (omap A B) :=
+      fun X A B f g =>
+        C.fw (interchange (fst A) (fst B) (snd A) (snd B)) @ C.Prod.pair f g.
+
+    Proposition p1_pair : forall {X A B} (f : S.m X A) (g : S.m X B),
+      S.compose p1 (pair f g) = f.
+    Admitted.
+
+    Proposition p2_pair : forall {X A B} (f : S.m X A) (g : S.m X B),
+      S.compose p2 (pair f g) = g.
+    Admitted.
+
+    Proposition pair_pi_compose : forall {X A B} x,
+      @pair X A B (S.compose p1 x) (S.compose p2 x) = x.
+    Admitted.
+
+    Include CartesianStructureTheory S.
+    Include BifunctorTheory S S S.
+    Include SymmetricMonoidalStructureTheory S.
+  End Prod.
+
+  Include CartesianTheory S.
+End SigBaseCartesian.
+
 (** ** The category Sig has the same objects as SigBase but morphisms are async events *)
 Module SigDefinition (C : CocartesianCategory) (T : Terminals C) <: Category.
   Module Ev := AsyncEventsDefinition C T.
@@ -325,6 +389,9 @@ End SigDefinition.
 
 Module Type Sig (C : CocartesianCategory) (T : Terminals C).
   Include (SigDefinition C T).
+
+  Definition neg (S : t) := fst S.
+  Definition pos (S : t) := snd S.
 End Sig.
 
 (** ** Cocartesian structure for Sig *)
@@ -422,6 +489,67 @@ Module SigCocartesian (C : CocartesianCategory) (T : Terminals C)
   Include CocartesianTheory S.
 End SigCocartesian.
 
+(** ** Cartesian structure for Sig
+    Note: We need C to be bicartesian for the same reason as SigBaseCartesian *)
+Module SigCartesian (C : BicartesianCategory) (T : Terminals C)
+  (S : Sig C T) <: CartesianCategory.
+  Include S.
+  Import C.
+  Open Scope obj_scope.
+
+  Module Prod <: CartesianStructure S.
+    Import S.
+
+    (** We reuse the SigBase cartesian structure and lift via KlF *)
+    Module SB := SigBaseDefinition C.
+    Module SBC := SigBaseCartesian C SB.
+
+    (** Terminal object: (1, 1) *)
+    Definition unit : S.t := (C.Prod.unit, C.Prod.unit).
+
+    (** The terminal morphism lifted to Kleisli *)
+    Definition ter (X : S.t) : S.m X unit :=
+      Ev.L.KlF.fmap (SBC.Prod.ter X).
+
+    Proposition ter_uni : forall {X} (x y : S.m X unit), x = y.
+    Admitted.
+
+    (** Binary products: (A1, A2) × (B1, B2) = (A1 × B1, A2 × B2) *)
+    Definition omap (A B : S.t) : S.t :=
+      (C.Prod.omap (fst A) (fst B), C.Prod.omap (snd A) (snd B)).
+
+    (** Projections lifted to Kleisli *)
+    Definition p1 {A B : S.t} : S.m (omap A B) A :=
+      Ev.L.KlF.fmap (SBC.Prod.p1 (A:=A) (B:=B)).
+
+    Definition p2 {A B : S.t} : S.m (omap A B) B :=
+      Ev.L.KlF.fmap (SBC.Prod.p2 (A:=A) (B:=B)).
+
+    (** Pair in Kleisli: f and g are already Kleisli morphisms,
+        constructing the pair requires careful handling of the monad *)
+    Definition pair {X A B : S.t} (f : S.m X A) (g : S.m X B) : S.m X (omap A B).
+    Admitted.
+
+    Proposition p1_pair : forall {X A B} (f : S.m X A) (g : S.m X B),
+      S.compose p1 (pair f g) = f.
+    Admitted.
+
+    Proposition p2_pair : forall {X A B} (f : S.m X A) (g : S.m X B),
+      S.compose p2 (pair f g) = g.
+    Admitted.
+
+    Proposition pair_pi_compose : forall {X A B} x,
+      @pair X A B (S.compose p1 x) (S.compose p2 x) = x.
+    Admitted.
+
+    Include CartesianStructureTheory S.
+    Include BifunctorTheory S S S.
+    Include SymmetricMonoidalStructureTheory S.
+  End Prod.
+
+  Include CartesianTheory S.
+End SigCartesian.
+
 (** ** There is an obvious embedding from [SigBase C] to [C] *)
 Module SigBaseToC (C : CocartesianCategory) (S : SigBase C) <: FaithfulFunctor S C.
   Import C.
@@ -471,3 +599,89 @@ Module SigToAsyncEvent (C : CocartesianCategory) (T : Terminals C)
 
   Include (FunctorTheory S Ev).
 End SigToAsyncEvent.
+
+(** ** Bicartesian structure for SigBase *)
+Module SigBaseBicartesian (BC : BicartesianCategory) (S : SigBase BC) <: BicartesianCategory.
+  Module C <: CartesianCategory.
+    Include S.
+    Module SBC := SigBaseCartesian BC S.
+    Module Prod := SBC.Prod.
+    Include CartesianTheory S.
+  End C.
+
+  Module CC <: Cocartesian C.
+    Module SBCo := SigBaseCocartesian BC S.
+    Module Plus := SBCo.Plus.
+    Include CocartesianTheory C.
+  End CC.
+
+  Include C.
+  Include CC.
+End SigBaseBicartesian.
+
+(** ** Bicartesian structure for Sig *)
+Module SigBicartesian (BC : BicartesianCategory) (T : Terminals BC)
+  (S : Sig BC T) <: BicartesianCategory.
+  Module C <: CartesianCategory.
+    Include S.
+    Module SC := SigCartesian BC T S.
+    Module Prod := SC.Prod.
+    Include CartesianTheory S.
+  End C.
+
+  Module CC <: Cocartesian C.
+    Module SCo := SigCocartesian BC T S.
+    Module Plus := SCo.Plus.
+    Include CocartesianTheory C.
+  End CC.
+
+  Include C.
+  Include CC.
+End SigBicartesian.
+
+(** ** Embedding a signature as a ALTS *)
+
+Module SigToAlts (S : Sig PosetBicartesian PosetTerminals) <: FaithfulFunctor S Alts.
+  Import S.
+  Import PosetBicartesian.
+  Import DCPO.
+  Import DownsetMonad.
+  Open Scope obj_scope.  
+  
+  Program Definition omap (X : S.t) : Alts.t := 
+    {|
+      Alts.labels := neg X + pos X;
+      Alts.states := T;
+      Alts.step := 
+        @mkm T _ (fun _ =>
+          mk_dset (fun _ => True) _) _;
+    |}.
+  Next Obligation.
+    trivial.
+  Qed.
+  Next Obligation.
+    intros; constructor.
+  Qed.
+
+  Program Definition fmap {A B : S.t} (f : S.m A B) : Alts.m (omap A) (omap B) :=
+    {|
+      Alts.morL := f;
+      Alts.morS := Kl.id T;
+    |}.
+  Next Obligation.
+  Admitted.
+
+  Proposition fmap_id : forall A, fmap (S.id A) = Alts.id (omap A).
+  Admitted.
+
+  Proposition fmap_compose :
+    forall {A B C} (g : S.m B C) (f : S.m A B),
+    fmap (S.compose g f) = Alts.compose (fmap g) (fmap f).
+  Admitted.
+
+  Proposition faithful :
+    forall {A B} (f g : S.m A B), fmap f = fmap g -> f = g.
+  Admitted.
+
+  Include (FunctorTheory S Alts).
+End SigToAlts.
