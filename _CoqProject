@@ -42,8 +42,8 @@ interfaces/Adjunctions.v
 interfaces/Monads.v
 interfaces/LiftMonad.v
 
-models/PosetBicartesian.v
-models/DCPOBicartesian.v
+models/oalts/PosetBicartesian.v
+models/oalts/DCPOBicartesian.v
 models/oalts/interfaces/DCPOEnrichedCat.v
 models/oalts/interfaces/LiftToKleisli.v
 models/oalts/DownsetMonad.v
