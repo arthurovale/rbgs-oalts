@@ -11,7 +11,7 @@ Module Type DCPOCategoryDefinition <: CategoryDefinition.
     Parameter compose_continuous_l : forall A B C (g : m B C),
         @ScottContinuous _ _ (hom_dcpo A B) (@dc_po _ (hom_dcpo A C)) (fun f => compose g f).
 
-    Parameter compose_continuous__r : forall A B C (f : m A B),
+    Parameter compose_continuous_r : forall A B C (f : m A B),
         @ScottContinuous _ _ (hom_dcpo B C) (@dc_po _ (hom_dcpo A C)) (fun g => compose g f).
 End DCPOCategoryDefinition.
 
