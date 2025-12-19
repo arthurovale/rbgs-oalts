@@ -11,8 +11,8 @@ Require Import FunctionalExtensionality.
 
 (** * The category of DCPOs is Bicartesian *)
 
-(** We show that [DCPO] from DCPO.v has both products (meets) and
-    coproducts (joins), making it a bicartesian category. *)
+(** We show that [DCPO] from DCPO.v has both products and
+    coproducts, making it a bicartesian category. *)
 
 (** ** Cartesian Structure *)
 
