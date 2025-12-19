@@ -28,9 +28,8 @@ Module PosetCartesianStructure <: CartesianStructureDefinition Poset.
 
   Definition unit : t := @Poset.mkt unit unit_PartialOrder.
 
-  Definition ter (X : t) : m X unit.
-  Proof.
-    refine (@Poset.mkm X unit (fun _ => tt) _).
+  Program Definition ter (X : t) : m X unit := @Poset.mkm X unit (fun _ => tt) _.
+  Next Obligation.
     intros x y _. exact I.
   Defined.
 
@@ -67,21 +66,19 @@ Module PosetCartesianStructure <: CartesianStructureDefinition Poset.
 
     Definition prod : t := @Poset.mkt ProdPO ProdPO_PartialOrder.
 
-    Definition proj1 : m prod A.
-    Proof.
-      refine (@Poset.mkm prod A fst _).
+    Program Definition proj1 : m prod A := @Poset.mkm prod A fst _.
+    Next Obligation.
       intros [a1 b1] [a2 b2] [Ha Hb]. exact Ha.
     Defined.
 
-    Definition proj2 : m prod B.
-    Proof.
-      refine (@Poset.mkm prod B snd _).
+    Program Definition proj2 : m prod B := @Poset.mkm prod B snd _.
+    Next Obligation.
       intros [a1 b1] [a2 b2] [Ha Hb]. exact Hb.
     Defined.
 
-    Definition mk_pair {X : t} (f : m X A) (g : m X B) : m X prod.
-    Proof.
-      refine (@Poset.mkm X prod (fun x => (Poset.apply X A f x, Poset.apply X B g x)) _).
+    Program Definition mk_pair {X : t} (f : m X A) (g : m X B) : m X prod :=
+      @Poset.mkm X prod (fun x => (Poset.apply X A f x, Poset.apply X B g x)) _.
+    Next Obligation.
       intros x y Hxy. split.
       - apply (Poset.morphism X A f). exact Hxy.
       - apply (Poset.morphism X B g). exact Hxy.
@@ -134,9 +131,9 @@ Module PosetCocartesianStructure <: CocartesianStructureDefinition Poset.
 
   Definition unit : t := @Poset.mkt Empty_set Empty_PartialOrder.
 
-  Definition ini (X : t) : m unit X.
-  Proof.
-    refine (@Poset.mkm unit X (fun e => match e with end) _).
+  Program Definition ini (X : t) : m unit X :=
+    @Poset.mkm unit X (fun e => match e with end) _.
+  Next Obligation.
     intros [].
   Defined.
 
@@ -159,40 +156,40 @@ Module PosetCocartesianStructure <: CocartesianStructureDefinition Poset.
       | _, _ => False
       end.
 
-    Definition CoprodPO_PartialOrder : DCPO.PartialOrder CoprodPO.
-    Proof.
-      refine {| DCPO.le := CoprodPO_le |}.
-      - constructor.
-        + intros [a | b]; simpl. reflexivity. reflexivity.
-        + intros [a1 | b1] [a2 | b2] [a3 | b3]; try contradiction; simpl;
-            intros H1 H2; etransitivity; eauto.
-      - intros [a1 | b1] [a2 | b2]; try contradiction; simpl; intros H1 H2;
-          f_equal.
-        + exact (@le_po (Poset.carrier A) (Poset.structure A) a1 a2 H1 H2).
-        + exact (@le_po (Poset.carrier B) (Poset.structure B) b1 b2 H1 H2).
-    Defined.
+    Program Definition CoprodPO_PartialOrder : DCPO.PartialOrder CoprodPO :=
+      {| DCPO.le := CoprodPO_le |}.
+    Next Obligation.
+      constructor.
+      - intros [a | b]; simpl. reflexivity. reflexivity.
+      - intros [a1 | b1] [a2 | b2] [a3 | b3]; try contradiction; simpl;
+          intros H1 H2; etransitivity; eauto.
+    Qed.
+    Next Obligation.
+      intros [a1 | b1] [a2 | b2]; try contradiction; simpl; intros H1 H2;
+        f_equal.
+      - exact (@le_po (Poset.carrier A) (Poset.structure A) a1 a2 H1 H2).
+      - exact (@le_po (Poset.carrier B) (Poset.structure B) b1 b2 H1 H2).
+    Qed.
 
     Definition coprod : t := @Poset.mkt CoprodPO CoprodPO_PartialOrder.
 
-    Definition inj1 : m A coprod.
-    Proof.
-      refine (@Poset.mkm A coprod inl _).
+    Program Definition inj1 : m A coprod := @Poset.mkm A coprod inl _.
+    Next Obligation.
       intros a1 a2 Ha. exact Ha.
     Defined.
 
-    Definition inj2 : m B coprod.
-    Proof.
-      refine (@Poset.mkm B coprod inr _).
+    Program Definition inj2 : m B coprod := @Poset.mkm B coprod inr _.
+    Next Obligation.
       intros b1 b2 Hb. exact Hb.
     Defined.
 
-    Definition mk_copair {X : t} (f : m A X) (g : m B X) : m coprod X.
-    Proof.
-      refine (@Poset.mkm coprod X
-                (fun ab => match ab with
-                           | inl a => Poset.apply A X f a
-                           | inr b => Poset.apply B X g b
-                           end) _).
+    Program Definition mk_copair {X : t} (f : m A X) (g : m B X) : m coprod X :=
+      @Poset.mkm coprod X
+        (fun ab => match ab with
+                   | inl a => Poset.apply A X f a
+                   | inr b => Poset.apply B X g b
+                   end) _.
+    Next Obligation.
       intros [a1 | b1] [a2 | b2]; try contradiction; simpl; intros H.
       - apply (Poset.morphism A X f). exact H.
       - apply (Poset.morphism B X g). exact H.
