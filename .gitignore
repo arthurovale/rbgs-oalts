@@ -17,3 +17,6 @@ Makefile.conf
 *.vrb
 *~
 html/
+
+# opam
+_opam
