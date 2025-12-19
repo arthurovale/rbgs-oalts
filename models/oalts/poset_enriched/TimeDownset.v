@@ -5,11 +5,13 @@ Require Import interfaces.MonoidalCategory.
 Require Import interfaces.Monads.
 Require Import interfaces.LiftMonad.
 Require Import models.DCPO.
-Require Import models.PosetBicartesian.
 Require Import models.oalts.DownsetMonad.
-Require Import models.oalts.AsyncEvent.
 Require Import models.oalts.TimeFunctor.
 Require Import models.oalts.interfaces.LiftToKleisli.
+Require Import models.oalts.poset_enriched.PosetBicartesian.
+Require Import models.oalts.poset_enriched.PosetAsyncEvents.
+Require Import models.oalts.poset_enriched.PosetDownsetKleisli.
+Require Import models.oalts.interfaces.PosetEnrichedCat.
 
 (** * Distributive Law: Time Functor over Downset Monad *)
 
@@ -23,10 +25,6 @@ Require Import models.oalts.interfaces.LiftToKleisli.
     Given (α, D) where α ∈ L(E) = 1 + E and D is a downset of S:
       λ(α, D) = {(α', s) | α' ≤ α ∧ s ∈ D}
 *)
-
-(** ** Async Events on Poset *)
-
-Module PosetAsyncEvents := AsyncEventsDefinition PosetBicartesian PosetTerminals.
 
 (** ** Time Functor for Poset *)
 
@@ -222,3 +220,62 @@ End TimeDownsetDistr.
 Module LiftedTimeFunctor :=
   LiftBifunctorToKleisli PosetAsyncEvents PosetBicartesian DownsetMonad
     PosetTimeFunctor TimeDownsetDistr.
+
+(** ** LiftedTimeFunctor is a Poset-Enriched Bifunctor *)
+
+Module LiftedTimePosetBifunctor <: PosetBifunctorDefinition
+    PosetAsyncEventsPosetCat PosetDownsetKl PosetDownsetKl.
+
+  Import Poset.
+  Import DownsetMonadDef.
+  Import PosetDownsetKleisli.
+  Import PosetAsyncEventsEnriched.
+  Import coqrel.LogicalRelations.
+
+  Module F := LiftedTimeFunctor.
+  Include F.
+
+  (** fmap is monotone in the first argument *)
+  Lemma fmap_monotonic_l :
+    forall {A1 A2 B1 B2} (f2 : PosetDownsetKl.m A2 B2),
+      Monotonic (fun f1 => fmap f1 f2)
+        (@le _ (PosetAsyncEventsPosetCat.hom_po A1 B1) ++>
+         @le _ (PosetDownsetKl.hom_po (omap A1 A2) (omap B1 B2))).
+  Proof.
+    intros E1 E2 X1 X2 f e1 e2 He.
+    unfold fmap, PosetBicartesian.compose.
+    simpl. intros [α1 x1] [α2 x2] [Hα Hx].
+    simpl in *.
+    split.
+    - (* Show L.KlU.fmap e2 α1 ≥ α2, given L.KlU.fmap e1 α1 ≥ α2 *)
+      unfold hom_le in He.
+      destruct α1 as [u1 | ev1].
+      + (* α1 = inl u1: L.ext e α1 = inl tt for any e *)
+        destruct α2 as [u2 | ev2]; simpl in *; auto.
+      + (* α1 = inr ev1: L.ext e α1 depends on e ev1 *)
+        specialize (He ev1).
+        destruct (e1 ev1) as [u1' | ev1'] eqn:He1;
+        destruct (e2 ev1) as [u2' | ev2'] eqn:He2;
+        destruct α2 as [u2 | ev2]; simpl in *; try contradiction; auto.
+        (* e1 ev1 = inr, e2 ev1 = inr, α2 = inr: use transitivity *)
+        eapply (@transitivity _ _ _ ev2 _ _); eauto.
+    - exact Hx.
+  Qed.
+
+  (** fmap is monotone in the second argument *)
+  Lemma fmap_monotonic_r :
+    forall {A1 A2 B1 B2} (f1 : PosetAsyncEventsPosetCat.m A1 B1),
+      Monotonic (fun f2 => fmap f1 f2)
+        (@le _ (PosetDownsetKl.hom_po A2 B2) ++>
+         @le _ (PosetDownsetKl.hom_po (omap A1 A2) (omap B1 B2))).
+  Proof.
+    intros E1 E2 X1 X2 e f1 f2 Hf.
+    unfold fmap, PosetBicartesian.compose.
+    simpl. intros [α1 x1] [α2 x2] [Hα Hx].
+    simpl in *.
+    split.
+    - exact Hα.
+    - apply Hf. exact Hx.
+  Qed.
+
+End LiftedTimePosetBifunctor.
