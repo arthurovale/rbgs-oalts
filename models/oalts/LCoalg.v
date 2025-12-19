@@ -282,7 +282,7 @@ Require Import models.DCPO.
 Require Import models.oalts.interfaces.DCPOEnrichedCat.
 
 (** For now, we just derive CategoryDefinition. The DCPO enrichment
-    (hom_dcpo, compose_continuous_l, compose_continuous__r) can be added later. *)
+    (hom_dcpo, compose_continuous_l, compose_continuous_r) can be added later. *)
 Module Type DCPOLCoalgDefinition
   (L : CategoryDefinition) (S : DCPOCategoryDefinition)
   (F : BifunctorDefinition L S S)
@@ -348,7 +348,7 @@ Module DCPOLCoalgTheory
       pose proof (coalg_fw_sim_cond f) as Hf.
       pose proof (@sc_le _ _ _ _
         (fun h => S.compose h (morS f))
-        (S.compose_continuous__r (states α) (states β) (F.omap (labels γ) (states γ)) (morS f))) as Hmono_r.
+        (S.compose_continuous_r (states α) (states β) (F.omap (labels γ) (states γ)) (morS f))) as Hmono_r.
       pose proof (@sc_le _ _ _ _
         (fun h => S.compose (F.fmap (morL g) (morS g)) h)
         (S.compose_continuous_l (states α) (F.omap (labels β) (states β)) (F.omap (labels γ) (states γ)) (F.fmap (morL g) (morS g)))) as Hmono_l.
@@ -436,7 +436,7 @@ Module DCPOLCoalgTheory
       pose proof (coalg_bw_sim_cond f) as Hf.
       pose proof (@sc_le _ _ _ _
         (fun h => S.compose h (morS f))
-        (S.compose_continuous__r (states α) (states β) (F.omap (labels γ) (states γ)) (morS f))) as Hmono_r.
+        (S.compose_continuous_r (states α) (states β) (F.omap (labels γ) (states γ)) (morS f))) as Hmono_r.
       pose proof (@sc_le _ _ _ _
         (fun h => S.compose (F.fmap (morL g) (morS g)) h)
         (S.compose_continuous_l (states α) (F.omap (labels β) (states β)) (F.omap (labels γ) (states γ)) (F.fmap (morL g) (morS g)))) as Hmono_l.
