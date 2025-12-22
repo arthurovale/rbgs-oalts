@@ -1044,12 +1044,8 @@ Module Type CocartesianCategory :=
   Cocartesian.
 
 (** ** Bicartesian category interface *)
-Module Type BicartesianCategory.
-  Declare Module C : CartesianCategory.
-  Declare Module CC : Cocartesian C.
-  Include C.
-  Include CC.
-End BicartesianCategory.
+Module Type BicartesianCategory := 
+  CartesianCategory <+ CocartesianDefinition.
 
 
 (** * Monoidal functors *)

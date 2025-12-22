@@ -42,21 +42,9 @@ interfaces/Adjunctions.v
 interfaces/Monads.v
 interfaces/LiftMonad.v
 
-models/oalts/interfaces/LiftToKleisli.v
 models/oalts/LCoalg.v
-models/oalts/AsyncEvent.v
-
-models/oalts/interfaces/PosetEnrichedCat.v
-models/oalts/poset_enriched/PosetBicartesian.v
-models/oalts/poset_enriched/PosetAsyncEvents.v
-models/oalts/poset_enriched/PosetLCoalg.v
-models/oalts/poset_enriched/PosetDownsetKleisli.v
-
+models/oalts/AsyncEvents.v
 models/oalts/DownsetMonad.v
 models/oalts/Sig.v
 models/oalts/TimeFunctor.v
-models/oalts/poset_enriched/TimeDownset.v
-models/oalts/poset_enriched/PosetAlts.v
-models/oalts/poset_enriched/SigToPosetAlts.v
-models/oalts/poset_enriched/Example.v
 models/oalts/Alts.v
