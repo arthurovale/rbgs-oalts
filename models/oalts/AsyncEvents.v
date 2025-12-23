@@ -196,6 +196,8 @@ Module AsyncEventsBicartesian <: BicartesianCategory.
     Include SymmetricMonoidalStructureTheory AsyncEventsBase.
   End Plus.
 
+  Include CocartesianTheory AsyncEventsBase.
+
 End AsyncEventsBicartesian.
 
 Module AsyncEvents <: BicartesianCategory.

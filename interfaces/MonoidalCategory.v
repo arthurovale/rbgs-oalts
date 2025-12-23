@@ -1045,7 +1045,7 @@ Module Type CocartesianCategory :=
 
 (** ** Bicartesian category interface *)
 Module Type BicartesianCategory := 
-  CartesianCategory <+ CocartesianDefinition.
+  CartesianCategory <+ Cocartesian.
 
 
 (** * Monoidal functors *)
