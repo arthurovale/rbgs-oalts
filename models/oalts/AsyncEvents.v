@@ -14,11 +14,16 @@ Module AsyncEventsBase <: Category.
 
   Definition t : Type := Type.
 
-  Notation τ := (inr tt).
-  Notation "' x" := (inl x) (at level 9, x at next level).
+  Inductive Async (T : Type) : Type := 
+  | vis (x : T)
+  | τ.
+  Arguments vis {T} x.
+  Arguments τ {T}.
+
+  Notation "' x" := (vis x) (at level 9, x at next level).
 
   Definition m : t -> t -> Type :=
-      fun A => fun B => A -> (B + unit).
+      fun A => fun B => A -> Async B.
 
   Program Definition id (A : t) : m A A := fun ev => 'ev.
 
@@ -33,7 +38,7 @@ Module AsyncEventsBase <: Category.
     forall {A B} (f : m A B), compose (id B) f = f.
   Proof.
     intros; extensionality ev; unfold compose;
-    destruct (f ev) as [ev' | []];
+    destruct (f ev) as [ev' | ];
     easy.
   Qed.
 
@@ -48,7 +53,7 @@ Module AsyncEventsBase <: Category.
     compose (compose h g) f = compose h (compose g f).
   Proof.
     intros; extensionality ev; unfold compose;
-    destruct (f ev) as [ev' | []]; reflexivity.
+    destruct (f ev) as [ev' | ]; reflexivity.
   Qed.
 
   Proposition unit_unique : forall x y : unit, x = y.
@@ -75,7 +80,7 @@ Module AsyncEventsBicartesian <: BicartesianCategory.
     Proposition ter_uni : forall {X} (x y : m X unit), x = y.
     Proof.
       intros; extensionality ev.
-      destruct (x ev) as [[] | []], (y ev) as [[] | []]; reflexivity.
+      destruct (x ev) as [[] | ], (y ev) as [[] | ]; reflexivity.
     Qed.
 
     Inductive asyncProd {A B : Type} : Type :=
@@ -119,21 +124,21 @@ Module AsyncEventsBicartesian <: BicartesianCategory.
       compose p1 (pair f g) = f.
     Proof.
       intros; extensionality x; unfold compose, pair, p1.
-      destruct (f x) as [a | []], (g x) as [b | []]; reflexivity.
+      destruct (f x) as [a | ], (g x) as [b | ]; reflexivity.
     Qed.
 
     Proposition p2_pair : forall {X A B} (f : m X A) (g : m X B),
       compose p2 (pair f g) = g.
     Proof.
       intros; extensionality x; unfold compose, pair, p2.
-      destruct (f x) as [a | []], (g x) as [b | []]; reflexivity.
+      destruct (f x) as [a | ], (g x) as [b | ]; reflexivity.
     Qed.
 
     Proposition pair_pi_compose : forall {X A B} f,
       @pair X A B (compose p1 f) (compose p2 f) = f.
     Proof.
       intros; extensionality ev. unfold compose, pair, p1, p2.
-      destruct (f ev) as [[a b | a | b] | []]. all: reflexivity.
+      destruct (f ev) as [[a b | a | b] | ]. all: reflexivity.
     Qed.
 
     Include CartesianStructureTheory AsyncEventsBase.

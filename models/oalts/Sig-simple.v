@@ -22,8 +22,7 @@ Module SigBase <: Category.
     fun A => fun B =>
       ((AsyncEvents.m A^- B^-) * (AsyncEvents.m A^+ B^+))%type.
 
-  Definition id (A : t) : m A A :=
-    (AsyncEvents.id A^-, AsyncEvents.id A^+).
+  Definition id (A : t) : m A A := (id A^-, id A^+).
 
   Definition compose : forall {A B C}, m B C -> m A B -> m A C :=
     fun A B C => fun g => fun f => (g^- @ f^-, g^+ @ f^+).
@@ -31,20 +30,23 @@ Module SigBase <: Category.
   Proposition compose_id_left :
     forall {A B} (f : m A B), compose (id B) f = f.
   Proof.
-    intros; apply injective_projections; apply AsyncEvents.compose_id_left.
+    intros; apply injective_projections; 
+    apply AsyncEvents.compose_id_left.
   Qed.
 
   Proposition compose_id_right :
     forall {A B} (f : m A B), compose f (id A) = f.
   Proof.
-    intros; apply injective_projections; apply AsyncEvents.compose_id_right.
+    intros; apply injective_projections; 
+    apply AsyncEvents.compose_id_right.
   Qed.
 
   Proposition compose_assoc :
     forall {A B C D} (f : m A B) (g : m B C) (h : m C D),
     compose (compose h g) f = compose h (compose g f).
   Proof.
-    intros; apply injective_projections; apply AsyncEvents.compose_assoc.
+    intros; apply injective_projections; 
+    apply AsyncEvents.compose_assoc.
   Qed.
 
   Include CategoryTheory.
@@ -72,7 +74,7 @@ Module SigBaseBicartesian <: BicartesianCategory.
 
     (** Binary products: (A-, A+) * (B-, B+) = (A- * B-, A+ * B+) *)
     Definition omap (A B : SigBase.t) : SigBase.t :=
-      (Prod.omap A^- B^-, Prod.omap A^+ B^+).
+      (A^- && B^-, A^+ && B^+)%obj.
 
     Definition p1 {A B : SigBase.t} : SigBase.m (omap A B) A :=
       (Prod.p1, Prod.p1).
@@ -161,20 +163,21 @@ Module SigBaseBicartesian <: BicartesianCategory.
     Include SymmetricMonoidalStructureTheory SigBase.
   End Plus.
 
+  Include CocartesianTheory SigBase.
+
 End SigBaseBicartesian.
 
 Module Negate <: FaithfulFunctor SigBase SigBase.
-  Import SigBase.
+  Import SigBaseBicartesian.
+  Open Scope obj_scope.
+  Open Scope hom_scope.
+
   (** Negate swaps the polarity: (A^-, A^+) ↦ (A^+, A^-) *)
 
-  Definition omap (A : t) : t := 
-    (A^+, A^-).
-
+  Definition omap (A : t) : t :=  (A^+, A^-).
   Notation "¬ A" := (omap A) (at level 35, right associativity) : obj_scope.
 
-  Definition fmap {A B : t} (f : m A B) : m (¬A) (¬B) := 
-    (f^+, f^-).
-
+  Definition fmap {A B : t} (f : m A B) : m (¬A) (¬B) := (f^+, f^-).
   Notation "¬ f" := (fmap f) (at level 35, right associativity) : hom_scope.
 
   Proposition fmap_id : forall A, ¬(id A) = id (omap A).
@@ -204,3 +207,14 @@ Module Negate <: FaithfulFunctor SigBase SigBase.
   Qed.
 
 End Negate.
+
+Module Sig <: BicartesianCategory.
+  Include SigBaseBicartesian.
+  Include Negate.
+
+  Notation sig := t.
+  Notation "[ A ]" := (AsyncEvents.Async (A^- + A^+)).
+  Notation "⊖ x" := (AsyncEvents.vis (inl x)) (at level 10, x at next level).
+  Notation "⊕ x" := (AsyncEvents.vis (inr x)) (at level 10, x at next level).
+
+End Sig.

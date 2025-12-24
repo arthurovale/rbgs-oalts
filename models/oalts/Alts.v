@@ -1,60 +1,33 @@
 Require Import interfaces.Category.
-Require Import interfaces.Functor.
-Require Import interfaces.Monads.
-Require Import models.PosetBicartesian.
-Require Import models.oalts.DownsetMonad.
-Require Import models.oalts.AsyncEvent.
-Require Import models.oalts.TimeFunctor.
-Require Import models.oalts.TimeDownset.
-Require Import models.oalts.LCoalg.
+Require Import oalts.AsyncEvents.
+Require Import oalts.Sig.
+Require Import oalts.PTree.
 
-(** * Alternating Simulations (ALTS)
+Module ALTS. (* <: Category. *)
+  Import Sig.
+  Import PTree.
 
-    We instantiate the labelled coalgebra framework with:
-    - Labels: async events (posets with a lifting functor L(E) = 1 + E)
-    - States: the Kleisli category of the Downset monad on Poset
-    - Functor: the Time functor lifted via the distributive law
+  Record ALTS {A : sig} := {
+    states : Type;
+    trans_neg : states -> A^- -> states -> Prop;
+    trans_pos : states -> A^+ -> states -> Prop;
+    trans_tau : states -> states -> Prop;
+  }.
+  Arguments ALTS : clear implicits.
 
-    An ALTS coalgebra (E, S, step) consists of:
-    - E : a poset of events
-    - S : a poset of states
-    - step : S → D(L(E) × S) in the Kleisli category
+  Section Beh.
+    Context {A : sig}.
+    Variable σ : ALTS A.
 
-    Morphisms are pairs (e, f) where e : E₁ → E₂ and f : S₁ → D(S₂)
-    such that the simulation diagram commutes.
-*)
-
-(** The category of ALTS coalgebras *)
-Module Alts := LCoalg PosetAsyncEvents DownsetMonad.Kl LiftedTimeFunctor.
-
-(** Convenient notation for ALTS types *)
-Module AltsNotation.
-  (** An ALTS is a coalgebra: events, states, and a step function *)
-  Definition alts := Alts.t.
-
-  (** A homomorphism between ALTS *)
-  Definition hom := Alts.m.
-
-  (** The events of an ALTS *)
-  Definition events (a : alts) : PosetAsyncEvents.t := Alts.labels a.
-
-  (** The states of an ALTS *)
-  Definition states (a : alts) : DownsetMonad.Kl.t := Alts.states a.
-
-  (** The step function of an ALTS:
-      step : S → D(L(E) × S) in the Kleisli category,
-      which means step : S → D(D(L(E) × S)) = S → DD(L(E) × S) *)
-  Definition step (a : alts) := Alts.step a.
-
-  (** Build an ALTS from components *)
-  Definition mk_alts := Alts.mk_coalg.
-
-  (** Build a homomorphism from components *)
-  Definition mk_hom := Alts.mk_coalg_mor.
-
-  (** Identity homomorphism *)
-  Definition id_hom := Alts.id.
-
-  (** Composition of homomorphisms *)
-  Definition compose_hom := @Alts.compose.
-End AltsNotation.
+    CoFixpoint beh (s : states σ) : ptree A :=
+      go (
+        StepF
+          (neg_X := neg_step s)
+          (pos_X := pos_step s)
+          (fun x => fst (proj1_sig x))      (* neg_label *)
+          (fun x => beh (snd (proj1_sig x))) (* neg_k *)
+          (fun x => fst (proj1_sig x))      (* pos_label *)
+          (fun x => beh (snd (proj1_sig x))) (* pos_k *)
+      ).
+  End Beh.
+End ALTS.

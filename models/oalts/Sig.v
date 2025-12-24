@@ -267,4 +267,10 @@ End Negate.
 Module Sig <: BicartesianCategory.
   Include SigBaseBicartesian.
   Include Negate.
+
+  Notation sig := t.
+  Notation "[ A ]" := (AsyncEvents.Async (A^- + A^+)).
+  Notation "⊖ x" := (AsyncEvents.vis (inl x)) (at level 10, x at next level).
+  Notation "⊕ x" := (AsyncEvents.vis (inr x)) (at level 10, x at next level).
+
 End Sig.
