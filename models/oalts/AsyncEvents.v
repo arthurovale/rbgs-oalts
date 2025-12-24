@@ -20,6 +20,7 @@ Module AsyncEventsBase <: Category.
   Arguments vis {T} x.
   Arguments τ {T}.
 
+  Notation "[ A ]" := (Async A).
   Notation "' x" := (vis x) (at level 9, x at next level).
 
   Definition m : t -> t -> Type :=

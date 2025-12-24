@@ -4,14 +4,13 @@ Require Import oalts.Sig.
 Require Import oalts.PTree.
 
 Module ALTS. (* <: Category. *)
+  Import AsyncEvents.  
   Import Sig.
   Import PTree.
 
   Record ALTS {A : sig} := {
     states : Type;
-    trans_neg : states -> A^- -> states -> Prop;
-    trans_pos : states -> A^+ -> states -> Prop;
-    trans_tau : states -> states -> Prop;
+    trans : states -> [A^- + A^+] -> states -> Prop;
   }.
   Arguments ALTS : clear implicits.
 
@@ -19,15 +18,21 @@ Module ALTS. (* <: Category. *)
     Context {A : sig}.
     Variable σ : ALTS A.
 
+    Inductive tau_star : states σ -> states σ -> Prop :=
+    | tau_refl : forall s, tau_star s s
+    | tau_step : forall s1 s2 s3, 
+        trans σ s1 τ s2 -> tau_star s2 s3 -> tau_star s1 s3.
+
+    (* τ* followed by visible step *)
+    Definition weak_trans (s : states σ) (ev : A^- + A^+) (s' : states σ) : Prop :=
+      exists s'', tau_star s s'' /\ trans σ s'' (vis ev) s'.
+
     CoFixpoint beh (s : states σ) : ptree A :=
       go (
-        StepF
-          (neg_X := neg_step s)
-          (pos_X := pos_step s)
-          (fun x => fst (proj1_sig x))      (* neg_label *)
-          (fun x => beh (snd (proj1_sig x))) (* neg_k *)
-          (fun x => fst (proj1_sig x))      (* pos_label *)
-          (fun x => beh (snd (proj1_sig x))) (* pos_k *)
+        StepF 
+          (X := { ev : A^- + A^+  &  { s' : states σ | weak_trans s ev s' }})
+          (fun x => projT1 x)
+          (fun x => beh (proj1_sig (projT2 x)))
       ).
   End Beh.
 End ALTS.
