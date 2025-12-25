@@ -44,5 +44,5 @@ interfaces/LiftMonad.v
 
 models/oalts/AsyncEvents.v
 models/oalts/Sig.v
-models/oalts/PTree.v
+models/oalts/Tree.v
 models/oalts/Alts.v

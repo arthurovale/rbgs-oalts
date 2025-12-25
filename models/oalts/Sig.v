@@ -213,6 +213,8 @@ Module Sig <: BicartesianCategory.
   Include Negate.
 
   Notation sig := t.
-  Notation "⊖ x" := (AsyncEvents.vis (inl x)) (at level 10, x at next level).
-  Notation "⊕ x" := (AsyncEvents.vis (inr x)) (at level 10, x at next level).
+  Delimit Scope event_scope with event.
+  Notation "⊖ x" := (inl x) (at level 10, x at next level) : event_scope.
+  Notation "⊕ x" := (inr x) (at level 10, x at next level) : event_scope.
+  Notation "[ f ]" := (AsyncEvents.Plus.fmap f^+ f^-) : event_scope.
 End Sig.
