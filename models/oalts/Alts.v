@@ -9,7 +9,8 @@ Module ALTS. (* <: Category. *)
 
   Record alts {A : Type} := {
     states : Type;
-    trans : states -> [A] -> states -> Prop;
+    trans :> states -> [A] -> states -> Prop;
+    reflexive : forall s, trans s ɛ s
   }.
   Arguments alts : clear implicits.
 
@@ -20,7 +21,7 @@ Module ALTS. (* <: Category. *)
     Inductive tau_star : states σ -> states σ -> Prop :=
     | tau_refl : forall s, tau_star s s
     | tau_step : forall s1 s2 s3, 
-        trans σ s1 τ s2 -> tau_star s2 s3 -> tau_star s1 s3.
+        σ s1 ɛ s2 -> tau_star s2 s3 -> tau_star s1 s3.
 
     Lemma tau_star_trans : forall (s1 s2 s3 : states σ),
       tau_star s1 s2 -> tau_star s2 s3 -> tau_star s1 s3.
@@ -30,9 +31,9 @@ Module ALTS. (* <: Category. *)
       econstructor; eauto.
     Qed.
 
-    (* τ* followed by visible step *)
+    (* ɛ* followed by visible step *)
     Definition weak_trans (s : states σ) (ev : A) (s' : states σ) : Prop :=
-      exists s'', tau_star s s'' /\ trans σ s'' (vis ev) s'.
+      exists s'', tau_star s s'' /\ σ s'' (vis ev) s'.
 
     CoFixpoint beh (s : states σ) : tree A :=
       go (
@@ -53,12 +54,12 @@ Module ALTS. (* <: Category. *)
     (* R comes before s1, s1' for paco compatibility *)
     Definition alts_simF (R : states σ -> states ρ -> Prop)
       (s1 : states σ) (s1' : states ρ) : Prop :=
-      (forall ev s2, trans σ s1 (vis ev) s2 ->
+      (forall ev s2, σ s1 (vis ev) s2 ->
         match f ev with
         | 'ev' => exists s2', weak_trans ρ s1' ev' s2' /\ R s2 s2'
-        | τ => R s2 s1'
+        | ɛ => R s2 s1'
         end) /\
-      (forall s2, trans σ s1 τ s2 -> R s2 s1').
+      (forall s2, σ s1 ɛ s2 -> R s2 s1').
 
     Lemma alts_simF_mon : monotone2 alts_simF.
     Proof.

@@ -7,18 +7,18 @@ Require Import Coq.Logic.FunctionalExtensionality.
 
 (** Asynchronous events are either a visible event or an invisible event. *)
 
-(** ** First, we model asynchrony by implicitly considering tau moves
+(** ** First, we model asynchrony by implicitly considering epsilon moves
   this is nicely achieved by using the lift monad *)
 
 Module AsyncEventsBase <: Category.
 
   Definition t : Type := Type.
 
-  Inductive Async (T : Type) : Type := 
+  Inductive Async (T : Type) : Type :=
   | vis (x : T)
-  | τ.
+  | ɛ.
   Arguments vis {T} x.
-  Arguments τ {T}.
+  Arguments ɛ {T}.
 
   Notation "[ A ]" := (Async A).
   Notation "' x" := (vis x) (at level 9, x at next level).
@@ -32,7 +32,7 @@ Module AsyncEventsBase <: Category.
     fun ev =>
       match f ev with
       | 'ev' => g ev'
-      | τ => τ
+      | ɛ => ɛ
       end.
 
   Proposition compose_id_left :
@@ -73,10 +73,10 @@ Module AsyncEventsBicartesian <: BicartesianCategory.
   (** First we establish the cartesian (product) structure *)
   Module Prod <: CartesianStructure AsyncEventsBase.
 
-    (** Terminal object: Empty_set (any morphism to it must be τ) *)
+    (** Terminal object: Empty_set (any morphism to it must be ɛ) *)
     Definition unit : t := Empty_set : Type.
 
-    Definition ter (X : t) : m X unit := fun ev => τ.
+    Definition ter (X : t) : m X unit := fun ev => ɛ.
 
     Proposition ter_uni : forall {X} (x y : m X unit), x = y.
     Proof.
@@ -101,14 +101,14 @@ Module AsyncEventsBicartesian <: BicartesianCategory.
         match obs with
         | ⟨a | b⟩ => 'a
         | ⟨a | ⟩ => 'a
-        | ⟨ | b⟩ => τ
+        | ⟨ | b⟩ => ɛ
         end.
 
     Definition p2 {A B : t} : m (omap A B) B :=
       fun obs =>
         match obs with
         | ⟨a | b⟩ => 'b
-        | ⟨a | ⟩ => τ
+        | ⟨a | ⟩ => ɛ
         | ⟨ | b⟩ => 'b
         end.
 
@@ -116,9 +116,9 @@ Module AsyncEventsBicartesian <: BicartesianCategory.
       fun x =>
         match f x, g x with
         | 'a, 'b => '⟨a | b⟩
-        | 'a, τ => '⟨a | ⟩
-        | τ, 'b => '⟨ | b⟩
-        | τ, τ => τ
+        | 'a, ɛ => '⟨a | ⟩
+        | ɛ, 'b => '⟨ | b⟩
+        | ɛ, ɛ => ɛ
         end.
 
     Proposition p1_pair : forall {X A B} (f : m X A) (g : m X B),

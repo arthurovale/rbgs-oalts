@@ -65,7 +65,7 @@ Module SigBaseBicartesian <: BicartesianCategory.
     Definition unit : t := (Empty_set : Type, Empty_set : Type).
 
     Definition ter (X : t) : m X unit := 
-      (fun ev => τ, fun ev => τ).
+      (fun ev => ɛ, fun ev => ɛ).
 
     Proposition ter_uni : forall {X} (x y : SigBase.m X unit), x = y.
     Proof.
@@ -215,11 +215,45 @@ Module Sig <: BicartesianCategory.
   Notation sig := t.
   Notation "A -o B" := (¬A + B)%obj (at level 50, left associativity) : obj_scope.
   Delimit Scope event_scope with event.
-  Notation "⊖ x" := (inl x) (at level 10, x at next level) : event_scope.
-  Notation "⊕ x" := (inr x) (at level 10, x at next level) : event_scope.
+  Notation "'src' x" := (inl x) (at level 10, x at next level) : event_scope.
+  Notation "'tgt' x" := (inr x) (at level 10, x at next level) : event_scope.
   Notation "[ f ]" := (AsyncEvents.Plus.fmap f^- f^+) : event_scope.
   Notation "[ A ]" := (AsyncEvents.Plus.omap A^- A^+) : event_scope.
   Notation "« f »" := (AsyncEvents.Prod.fmap f^- f^+) : event_scope.
   Notation "« A »" := (AsyncEvents.Prod.omap A^- A^+) : event_scope.
+
+  Import AsyncEvents.
+  Local Open Scope event_scope.
+  Definition projL {A B : sig} (ev : Async «A -o B») : Async «A» :=
+    match ev with
+    | ɛ => ɛ
+    | vis obs =>
+        match obs with
+        | ⟨src ap | src am⟩ => '⟨am | ap⟩
+        | ⟨src ap | tgt _⟩  => '⟨| ap⟩
+        | ⟨tgt _ | src am⟩ => '⟨am |⟩
+        | ⟨tgt _ | tgt _⟩ => ɛ
+        | ⟨src ap |⟩ => '⟨| ap⟩
+        | ⟨tgt _ |⟩ => ɛ
+        | ⟨| src am⟩ => '⟨am |⟩
+        | ⟨| tgt _⟩ => ɛ
+        end
+    end.
+
+  Definition projR {A B : sig} (ev : Async «A -o B») : Async «B» :=
+    match ev with
+    | ɛ => ɛ
+    | vis obs =>
+        match obs with
+        | ⟨tgt bm | tgt bp⟩ => '⟨bm | bp⟩
+        | ⟨tgt bm | src _⟩ => '⟨bm |⟩
+        | ⟨src _ | tgt bp⟩ => '⟨| bp⟩
+        | ⟨src _ | src _⟩ => ɛ
+        | ⟨tgt bm |⟩ => '⟨bm |⟩
+        | ⟨src _ |⟩ => ɛ
+        | ⟨| tgt bp⟩ => '⟨| bp⟩
+        | ⟨| src _⟩ => ɛ
+        end
+    end.
 
 End Sig.
