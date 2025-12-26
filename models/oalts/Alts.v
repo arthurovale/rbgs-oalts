@@ -1,6 +1,5 @@
 Require Import interfaces.Category.
 Require Import oalts.AsyncEvents.
-Require Import oalts.Sig.
 Require Import oalts.Tree.
 From Paco Require Import paco.
 
@@ -135,5 +134,7 @@ Module ALTS. (* <: Category. *)
   Qed.
 
   End Sim.
+
+  #[export] Hint Resolve alts_simF_mon : paco.
 
 End ALTS.

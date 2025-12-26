@@ -48,7 +48,7 @@ Module Tree. (* <: Category. *)
     - apply LE. exact H.
   Qed.
 
-  Hint Resolve simF_mon : paco.
+  #[export] Hint Resolve simF_mon : paco.
 
   Definition sim {A B : Type} (f : m A B) : tree A -> tree B -> Prop :=
     paco2 (simF f) bot2.

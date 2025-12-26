@@ -208,4 +208,8 @@ End AsyncEventsBicartesian.
 
 Module AsyncEvents <: BicartesianCategory.
   Include AsyncEventsBicartesian.
+
+    Notation "⟨ a | b ⟩" := (Prod.sync a b) (at level 0).
+    Notation "⟨ a | ⟩" := (Prod.asyncl a) (at level 0).
+    Notation "⟨ | b ⟩" := (Prod.asyncr b) (at level 0).
 End AsyncEvents.
