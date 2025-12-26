@@ -217,9 +217,9 @@ Module Sig <: BicartesianCategory.
   Delimit Scope event_scope with event.
   Notation "⊖ x" := (inl x) (at level 10, x at next level) : event_scope.
   Notation "⊕ x" := (inr x) (at level 10, x at next level) : event_scope.
-  Notation "{+ f +}" := (AsyncEvents.Plus.fmap f^+ f^-) : event_scope.
-  Notation "{+ A +}" := (AsyncEvents.Plus.omap A^+ A^-) : event_scope.
-  Notation "[ f ]" := (AsyncEvents.Prod.fmap f^+ f^-) : event_scope.
-  Notation "[ A ]" := (AsyncEvents.Prod.omap A^+ A^-) : event_scope.
+  Notation "[ f ]" := (AsyncEvents.Plus.fmap f^- f^+) : event_scope.
+  Notation "[ A ]" := (AsyncEvents.Plus.omap A^- A^+) : event_scope.
+  Notation "« f »" := (AsyncEvents.Prod.fmap f^- f^+) : event_scope.
+  Notation "« A »" := (AsyncEvents.Prod.omap A^- A^+) : event_scope.
 
 End Sig.
