@@ -2,6 +2,8 @@ Require Import oalts.AsyncEvents.
 Require Import oalts.Sig.
 Require Import models.Sets.
 From Paco Require Import paco.
+Require Import Basics. (* for flip *)
+Require Import coqrel.RelOperators. (* for rel_compose *)
 
 Module Tree. (* <: Category. *)
   Import AsyncEvents.
@@ -45,6 +47,31 @@ Module Tree. (* <: Category. *)
 
     Hint Resolve simF_mon : paco.
 
+    Lemma simF_refl {A : Type} (R : tree A -> tree A -> Prop) (p : tree A) :
+      (forall t, R t t) -> simF R p p.
+    Proof.
+      unfold simF. intros Hrefl.
+      destruct (observe p) as [X step_p k_p].
+      intros x. exists x. split.
+      - reflexivity.
+      - apply Hrefl.
+    Qed.
+
+    Lemma simF_trans {A : Type} (R S : tree A -> tree A -> Prop) (p q s : tree A) :
+      simF R p q -> simF S q s -> simF (rel_compose R S) p s.
+    Proof.
+      unfold simF. intros Hpq Hqs.
+      destruct (observe p) as [X step_p k_p].
+      destruct (observe q) as [Y step_q k_q].
+      destruct (observe s) as [Z step_s k_s].
+      intros x.
+      specialize (Hpq x). destruct Hpq as [y [Heq_pq HR_pq]].
+      specialize (Hqs y). destruct Hqs as [z [Heq_qs HR_qs]].
+      exists z. split.
+      - transitivity (step_q y); assumption.
+      - exists (k_q y). split; assumption.
+    Qed.
+
     Definition sim {A : Type} : tree A -> tree A -> Prop :=
       paco2 simF bot2.
 
@@ -71,31 +98,19 @@ Module Tree. (* <: Category. *)
 
     Proposition sim_refl {A : Type} (p : tree A) : sim p p.
     Proof.
-      revert p. pcofix IH.
-      intros p. pfold. unfold simF.
-      destruct (observe p) as [X step_p k_p].
-      intros x. exists x. split.
-      - reflexivity.
-      - right. apply IH.
+      revert p. pcofix IH. intros p. pfold.
+      apply simF_refl. intros t. right. apply IH.
     Qed.
-
-    (* Note: Simulation is NOT symmetric. That's what distinguishes it from
-       bisimulation. sim p q /\ sim q p <-> bisim p q *)
 
     Proposition sim_trans {A : Type} (p q s : tree A) :
       sim p q -> sim q s -> sim p s.
     Proof.
       revert p q s. pcofix IH. intros p q s Hpq Hqs.
-      punfold Hpq. punfold Hqs. pfold. unfold simF in *.
-      destruct (observe p) as [X step_p k_p].
-      destruct (observe q) as [Y step_q k_q].
-      destruct (observe s) as [Z step_s k_s].
-      intros x.
-      specialize (Hpq x). destruct Hpq as [y [Heq_pq HR_pq]].
-      specialize (Hqs y). destruct Hqs as [z [Heq_qs HR_qs]].
-      exists z. split.
-      - transitivity (step_q y); assumption.
-      - destruct HR_pq as [HR_pq | []]. destruct HR_qs as [HR_qs | []].
+      punfold Hpq. punfold Hqs. pfold.
+      eapply simF_mon.
+      - eapply simF_trans; eassumption.
+      - intros a c [b [Hab Hbc]].
+        destruct Hab as [Hab | []]. destruct Hbc as [Hbc | []].
         right. eapply IH; eassumption.
     Qed.
   End Simulation.
@@ -128,6 +143,86 @@ Module Tree. (* <: Category. *)
     Qed.
 
     Hint Resolve bisimF_mon : paco.
+
+    Lemma bisimF_refl {A : Type} (R : tree A -> tree A -> Prop) (p : tree A) :
+      (forall t, R t t) -> bisimF R p p.
+    Proof.
+      unfold bisimF. intros Hrefl.
+      destruct (observe p) as [X step_p k_p].
+      split; intros x; exists x; split; 
+      try reflexivity; try (apply Hrefl).
+    Qed.
+
+    Lemma bisimF_trans {A : Type} (R S : tree A -> tree A -> Prop) (p q s : tree A) :
+      bisimF R p q -> bisimF S q s -> bisimF (rel_compose R S) p s.
+    Proof.
+      unfold bisimF. intros Hpq Hqs.
+      destruct (observe p) as [X step_p k_p].
+      destruct (observe q) as [Y step_q k_q].
+      destruct (observe s) as [Z step_s k_s].
+      destruct Hpq as [Hpq_fw Hpq_bw].
+      destruct Hqs as [Hqs_fw Hqs_bw].
+      split.
+      - intros x.
+        specialize (Hpq_fw x). destruct Hpq_fw as [y [Heq_pq HR_pq]].
+        specialize (Hqs_fw y). destruct Hqs_fw as [z [Heq_qs HR_qs]].
+        exists z. split.
+        + transitivity (step_q y); assumption.
+        + exists (k_q y). split; assumption.
+      - intros z.
+        specialize (Hqs_bw z). destruct Hqs_bw as [y [Heq_qs HR_qs]].
+        specialize (Hpq_bw y). destruct Hpq_bw as [x [Heq_pq HR_pq]].
+        exists x. split.
+        + transitivity (step_q y); assumption.
+        + exists (k_q y). split; assumption.
+    Qed.
+
+    Lemma bisimF_simF {A : Type} (R : tree A -> tree A -> Prop) (p q : tree A) :
+      bisimF R p q -> simF R p q.
+    Proof.
+      unfold bisimF, simF.
+      destruct (observe p) as [X step_p k_p].
+      destruct (observe q) as [X' step_q k_q].
+      intros [Hfw _]. exact Hfw.
+    Qed.
+
+    Proposition bisimF_sym {A : Type} (R : tree A -> tree A -> Prop) (p q : tree A) :
+      bisimF R p q -> bisimF (flip R) q p.
+    Proof.
+      unfold bisimF.
+      destruct (observe p) as [X step_p k_p].
+      destruct (observe q) as [X' step_q k_q].
+      intros [Hfw Hbw]. split.
+      - intros x'. specialize (Hbw x').
+        destruct Hbw as [x [Heq HR]].
+        exists x. split.
+        + symmetry. exact Heq.
+        + exact HR.
+      - intros x. specialize (Hfw x).
+        destruct Hfw as [x' [Heq HR]].
+        exists x'. split.
+        + symmetry. exact Heq.
+        + exact HR.
+    Qed.
+
+    Lemma bisimF_mutual_simF {A : Type} (R : tree A -> tree A -> Prop) (p q : tree A) :
+      bisimF R p q <-> simF R p q /\ simF (flip R) q p.
+    Proof.
+      split.
+      - intros H. split.
+        + apply bisimF_simF. exact H.
+        + apply bisimF_simF. apply bisimF_sym. exact H.
+      - unfold bisimF, simF.
+        destruct (observe p) as [X step_p k_p].
+        destruct (observe q) as [X' step_q k_q].
+        intros [Hfw Hbw]. split.
+        + exact Hfw.
+        + intros x'. specialize (Hbw x').
+          destruct Hbw as [x [Heq HR]].
+          exists x. split.
+          * symmetry. exact Heq.
+          * exact HR.
+    Qed.
 
     Definition bisim {A : Type} : tree A -> tree A -> Prop :=
       paco2 (bisimF) bot2.
@@ -162,77 +257,43 @@ Module Tree. (* <: Category. *)
 
     Proposition bisim_refl {A : Type} (p : tree A) : bisim p p.
     Proof.
-      revert p. pcofix IH.
-      intros p. pfold. unfold bisimF.
-      destruct (observe p) as [X step_p k_p].
-      split.
-      - intros x. exists x. split.
-        + reflexivity.
-        + right. apply IH.
-      - intros x'. exists x'. split.
-        + reflexivity.
-        + right. apply IH.
+      revert p. pcofix IH. intros p. pfold.
+      apply bisimF_refl. intros t. right. apply IH.
     Qed.
 
     Proposition bisim_sym {A : Type} (p q : tree A) : bisim p q -> bisim q p.
     Proof.
       revert p q. pcofix IH. intros p q H.
-      punfold H. pfold. unfold bisimF in *.
-      destruct (observe p) as [X step_p k_p].
-      destruct (observe q) as [X' step_q k_q].
-      destruct H as [Hfw Hbw]. split.
-      - intros x'. specialize (Hbw x').
-        destruct Hbw as [x [Heq HR]].
-        exists x. split.
-        + symmetry. exact Heq.
-        + destruct HR as [HR | []]. right. apply IH. exact HR.
-      - intros x. specialize (Hfw x).
-        destruct Hfw as [x' [Heq HR]].
-        exists x'. split.
-        + symmetry. exact Heq.
-        + destruct HR as [HR | []]. right. apply IH. exact HR.
+      punfold H. pfold.
+      apply bisimF_sym in H.
+      eapply bisimF_mon. exact H.
+      intros p' q' Hflip. unfold flip in Hflip.
+      destruct Hflip as [Hflip | []].
+      right. apply IH. exact Hflip.
     Qed.
 
     Proposition bisim_trans {A : Type} (p q s : tree A) :
       bisim p q -> bisim q s -> bisim p s.
     Proof.
       revert p q s. pcofix IH. intros p q s Hpq Hqs.
-      punfold Hpq. punfold Hqs. pfold. unfold bisimF in *.
-      destruct (observe p) as [X step_p k_p].
-      destruct (observe q) as [Y step_q k_q].
-      destruct (observe s) as [Z step_s k_s].
-      destruct Hpq as [Hpq_fw Hpq_bw].
-      destruct Hqs as [Hqs_fw Hqs_bw].
-      split.
-      - intros x.
-        specialize (Hpq_fw x). destruct Hpq_fw as [y [Heq_pq HR_pq]].
-        specialize (Hqs_fw y). destruct Hqs_fw as [z [Heq_qs HR_qs]].
-        exists z. split.
-        + transitivity (step_q y); assumption.
-        + destruct HR_pq as [HR_pq | []]. destruct HR_qs as [HR_qs | []].
-          right. eapply IH; eassumption.
-      - intros z.
-        specialize (Hqs_bw z). destruct Hqs_bw as [y [Heq_qs HR_qs]].
-        specialize (Hpq_bw y). destruct Hpq_bw as [x [Heq_pq HR_pq]].
-        exists x. split.
-        + transitivity (step_q y); assumption.
-        + destruct HR_pq as [HR_pq | []]. destruct HR_qs as [HR_qs | []].
-          right. eapply IH; eassumption.
+      punfold Hpq. punfold Hqs. pfold.
+      eapply bisimF_mon.
+      - eapply bisimF_trans; eassumption.
+      - intros a c [b [Hab Hbc]].
+        destruct Hab as [Hab | []]. destruct Hbc as [Hbc | []].
+        right. eapply IH; eassumption.
     Qed.
 
     Lemma bisim_sim_fwd {A : Type} (p q : tree A) :
       bisim p q -> sim p q.
     Proof.
       revert p q. pcofix IH. intros p q H.
-      punfold H. pfold. unfold bisimF, simF in *.
-      destruct (observe p) as [X step_p k_p].
-      destruct (observe q) as [X' step_q k_q].
-      destruct H as [Hfw Hbw].
-      intros x.
-      specialize (Hfw x). destruct Hfw as [x' [Heq HR]].
-      exists x'. split.
-      - exact Heq.
-      - destruct HR as [HR | []]. right. apply IH. exact HR.
+      punfold H. pfold.
+      apply bisimF_simF in H.
+      eapply simF_mon. exact H.
+      intros p' q' Hbisim.
+      destruct Hbisim as [Hbisim | []].
+      right. apply IH. exact Hbisim.
     Qed.
 
     Proposition bisim_impl_sim {A : Type} (p q : tree A) :
