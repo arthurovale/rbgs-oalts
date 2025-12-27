@@ -10,7 +10,6 @@ Module ALTS. (* <: Category. *)
   Record alts {A : Type} := {
     states : Type;
     trans :> states -> [A] -> states -> Prop;
-    reflexive : forall s, trans s ɛ s
   }.
   Arguments alts : clear implicits.
 

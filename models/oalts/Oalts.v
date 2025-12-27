@@ -16,13 +16,13 @@ Module OALTS. (* <: Category. *)
       trans := fun s ev s' => 
         (exists evs evt, 
           (projR evs = projL evt /\ projL evs = projL ev /\ projR evt = projR ev) /\
-          (σ (fst s) evs (fst s') /\ τ (snd s) evt (snd s'))) (*\/*)
-        (* (exists evs, 
+          (σ (fst s) evs (fst s') /\ τ (snd s) evt (snd s'))) \/
+        (exists evs, 
           (projR evs = ɛ /\ projL evs = projL ev /\ ɛ = projR ev) /\
           (trans σ (fst s) evs (fst s') /\ snd s = snd s')) \/
         (exists evt,
           (ɛ = projL evt /\ ɛ = projL ev /\ projR evt = projR ev) /\
-          (fst s = fst s' /\ trans τ (snd s) evt (snd s'))); *)
+          (fst s = fst s' /\ trans τ (snd s) evt (snd s')));
     |}.
 
 End OALTS.
