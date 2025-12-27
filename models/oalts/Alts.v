@@ -44,20 +44,16 @@ Module ALTS. (* <: Category. *)
   End Beh.
 
   Section Sim.
-    Context {A B : Type} (f : m A B).
+    Context {A : Type}.
     Variable σ : alts A.
-    Variable ρ : alts B.
+    Variable ρ : alts A.
 
     (* Convention: σ states are s1, s2, etc. and ρ states are s1', s2', etc. *)
 
-    (* R comes before s1, s1' for paco compatibility *)
     Definition alts_simF (R : states σ -> states ρ -> Prop)
       (s1 : states σ) (s1' : states ρ) : Prop :=
       (forall ev s2, σ s1 (vis ev) s2 ->
-        match f ev with
-        | 'ev' => exists s2', weak_trans ρ s1' ev' s2' /\ R s2 s2'
-        | ɛ => R s2 s1'
-        end) /\
+        exists s2', weak_trans ρ s1' ev s2' /\ R s2 s2') /\
       (forall s2, σ s1 ɛ s2 -> R s2 s1').
 
     Lemma alts_simF_mon : monotone2 alts_simF.
@@ -65,9 +61,7 @@ Module ALTS. (* <: Category. *)
       unfold monotone2, alts_simF. intros s1 s1' R R' [Hvis Htau] LE.
       split.
       - intros ev s2 Htrans. specialize (Hvis ev s2 Htrans).
-        destruct (f ev) as [ev' |].
-        + destruct Hvis as [s2' [Hweak HR]]. exists s2'. split; auto.
-        + apply LE. exact Hvis.
+        destruct Hvis as [s2' [Hweak HR]]. exists s2'. split; auto.
       - intros s2 Htrans. apply LE. apply Htau. exact Htrans.
     Qed.
 
@@ -81,9 +75,7 @@ Module ALTS. (* <: Category. *)
     Proof.
       intros s1 s1' [Hvis Htau]. pfold. split.
       - intros ev s2 Htrans. specialize (Hvis ev s2 Htrans).
-        destruct (f ev) as [ev' |].
-        + destruct Hvis as [s2' [Hweak HR]]. exists s2'. split; auto.
-        + left. exact Hvis.
+        destruct Hvis as [s2' [Hweak HR]]. exists s2'. split; auto.
       - intros s2 Htrans. left. apply Htau. exact Htrans.
     Qed.
 
@@ -92,10 +84,8 @@ Module ALTS. (* <: Category. *)
     Proof.
       intros s1 s1' H. punfold H. destruct H as [Hvis Htau]. split.
       - intros ev s2 Htrans. specialize (Hvis ev s2 Htrans).
-        destruct (f ev) as [ev' |].
-        + destruct Hvis as [s2' [Hweak HR]]. exists s2'. split; auto.
-          destruct HR; auto. contradiction.
-        + destruct Hvis; auto. contradiction.
+        destruct Hvis as [s2' [Hweak HR]]. exists s2'. split; auto.
+        destruct HR; auto. contradiction.
       - intros s2 Htrans. specialize (Htau s2 Htrans).
         destruct Htau; auto. contradiction.
     Qed.
@@ -112,7 +102,7 @@ Module ALTS. (* <: Category. *)
     Qed.
 
   Theorem alts_sim_beh : forall s1 s1',
-    alts_sim s1 s1' -> sim f (beh σ s1) (beh ρ s1').
+    alts_sim s1 s1' -> sim (beh σ s1) (beh ρ s1').
   Proof.
     pcofix CIH.
     intros s1 s1' Hsim.
@@ -122,15 +112,11 @@ Module ALTS. (* <: Category. *)
     pose proof (alts_sim_tau_star s1 s3 s1' Hsim Hstar) as Hsim'.
     apply alts_sim_simF in Hsim' as [Hvis Htau].
     specialize (Hvis ev s2 Htrans).
-    destruct (f ev) as [ev' |] eqn:Hf.
-    + (* Visible case *)
-      destruct Hvis as [s2' [Hweak2 Hsim'']].
-      exists (existT _ ev' (exist _ s2' Hweak2)).
-      simpl. split.
-      * reflexivity.
-      * right. apply CIH. exact Hsim''.
-    + (* Tau case *)
-      right. apply CIH. exact Hvis.
+    destruct Hvis as [s2' [Hweak2 Hsim'']].
+    exists (existT _ ev (exist _ s2' Hweak2)).
+    simpl. split.
+    - reflexivity.
+    - right. apply CIH. exact Hsim''.
   Qed.
 
   End Sim.
