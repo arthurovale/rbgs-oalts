@@ -2,8 +2,7 @@ Require Import oalts.AsyncEvents.
 Require Import oalts.Sig.
 Require Import models.Sets.
 From Paco Require Import paco.
-Require Import Basics. (* for flip *)
-Require Import coqrel.RelOperators. (* for rel_compose *)
+Require Import coqrel.RelOperators.
 
 Module Tree. (* <: Category. *)
   Import AsyncEvents.
