@@ -20,13 +20,13 @@ Module Strat. (* <: Category *)
     end.
 
   CoFixpoint id (A : sig) : strat A A :=
-    go (StepF (X := [A]) id_gen (fun _ => id A)).
+    go (StepF [A] id_gen (fun _ => id A)).
 
   Module StLess.
     Import Sets.
 
     CoFixpoint StLess {A B : sig} (gen : Sig.m A B) : strat A B :=
-      go (StepF (X := [A]) 
+      go (StepF [A]
         (fun ev => 
           match ev with 
           | inl a => 
@@ -43,11 +43,11 @@ Module Strat. (* <: Category *)
         (fun _ => StLess gen)).
 
     Proposition id_stless_id {A : sig} :
-      bisim (id A) (StLess (Sig.id A)).
+      sbisim (id A) (StLess (Sig.id A)).
     Proof.
-      pcofix IH. pfold. unfold bisimF. simpl.
+      pcofix IH. pfold. unfold sbisimF. simpl.
       split; intros ev; exists ev;
-      destruct ev as [a | a]; split; 
+      destruct ev as [a | a]; split;
       try reflexivity; right; exact IH.
     Qed.
   End StLess.

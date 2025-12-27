@@ -5,6 +5,7 @@
 -R structures structures
 -R lattices lattices
 -R models models
+-R models/oalts oalts
 -R examples examples
 -R interfaces interfaces
 
@@ -46,3 +47,5 @@ models/oalts/AsyncEvents.v
 models/oalts/Sig.v
 models/oalts/Tree.v
 models/oalts/Alts.v
+models/oalts/Strat.v
+models/oalts/Oalts.v

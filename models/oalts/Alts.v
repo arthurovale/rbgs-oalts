@@ -37,7 +37,7 @@ Module ALTS. (* <: Category. *)
     CoFixpoint beh (s : states σ) : tree A :=
       go (
         StepF 
-          (X := { ev : A  &  { s' : states σ | weak_trans s ev s' }})
+          { ev : A  &  { s' : states σ | weak_trans s ev s' }}
           (fun x => projT1 x)
           (fun x => beh (proj1_sig (projT2 x)))
       ).
@@ -102,7 +102,7 @@ Module ALTS. (* <: Category. *)
     Qed.
 
   Theorem alts_sim_beh : forall s1 s1',
-    alts_sim s1 s1' -> sim (beh σ s1) (beh ρ s1').
+    alts_sim s1 s1' -> ssim (beh σ s1) (beh ρ s1').
   Proof.
     pcofix CIH.
     intros s1 s1' Hsim.
