@@ -213,16 +213,16 @@ Module AsyncEvents <: BicartesianCategory.
   Notation "⟨ a | ⟩" := (Prod.asyncl a) (at level 0).
   Notation "⟨ | b ⟩" := (Prod.asyncr b) (at level 0).
 
+  Definition AsyncF {A B : Type} (f : A -> B) : [A] -> [B] :=
+    fun ev => 
+      match ev with
+      | 'a => '(f a)
+      | ɛ => ɛ
+      end.
+
   Module AsyncF <: Functor SET SET.
     
     Definition omap : Type -> Type := Async.
-
-    Definition AsyncF {A B : Type} (f : A -> B) : [A] -> [B] :=
-      fun ev => 
-        match ev with
-        | 'a => '(f a)
-        | ɛ => ɛ
-        end.
 
     Definition fmap {A B : Type} : (A -> B) -> [A] -> [B] := 
       AsyncF.
@@ -245,15 +245,14 @@ Module AsyncEvents <: BicartesianCategory.
     Include FunctorTheory SET SET.
   End AsyncF.
 
+  Definition ext {A B : Type} (f : A -> [B]) : [A] -> [B] :=
+  fun ev =>
+    match ev with
+    | 'a => f a
+    | ɛ => ɛ
+    end.
+
   Module Ext <: Functor AsyncEventsBase SET.
-
-    Definition ext {A B : Type} (f : A -> [B]) : [A] -> [B] :=
-      fun ev =>
-        match ev with
-        | 'a => f a
-        | ɛ => ɛ
-        end.
-
       Definition omap : Type -> Type := Async.
 
       Definition fmap {A B : Type} : 
