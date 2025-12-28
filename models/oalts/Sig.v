@@ -220,9 +220,10 @@ Module Sig <: BicartesianCategory.
 
   (** The way we actually generate these events is by [«A -o B»] for strategies 
     and [«A -o B» + ɛ] for OALTS *)
-  Delimit Scope event_scope with event.
-  Notation "« f »" := (AsyncEvents.Prod.fmap f^- f^+) : event_scope.
-  Notation "« A »" := (AsyncEvents.Prod.omap A^- A^+) : event_scope.
+  Delimit Scope event_obj_scope with event_obj.
+  Delimit Scope event_hom_scope with event_hom.
+  Notation "« f »" := (AsyncEvents.Prod.fmap f^- f^+) : event_hom_scope.
+  Notation "« A »" := (AsyncEvents.Prod.omap A^- A^+) : event_obj_scope.
   (** It is worth hashing out what events are available in [«A -o B»].
     
     Every event looks like [⟨x | y⟩] where:
@@ -252,48 +253,83 @@ Module Sig <: BicartesianCategory.
   (** To make events of [«A -o B»] we introduce some notation for 
     [inl] and [inr], calling them [src] (meaning an [A] event) and 
     [tgt] (meaning a [B] event), respectively. *)
-  Notation "'src' x" := (inl x) (at level 10, x at next level) : event_scope.
-  Notation "'tgt' x" := (inr x) (at level 10, x at next level) : event_scope.
+  Notation "'src' x" := (inl x) (at level 10, x at next level) : event_obj_scope.
+  Notation "'tgt' x" := (inr x) (at level 10, x at next level) : event_obj_scope.
   
   (** At this point, we can define projections of events of [A -o B] to 
     events of [A] and [B] *)
   Import AsyncEvents.
-  Local Open Scope event_scope.
-  Definition projL {A B : sig} (ev : Async «A -o B») : Async «A» :=
+  Local Open Scope event_obj_scope.
+  Definition projL {A B : sig} (ev : «A -o B») : Async «A» :=
     match ev with
-    | ɛ => ɛ
-    | vis obs =>
-        match obs with
-        | ⟨src ap | src am⟩ => '⟨am | ap⟩
-        | ⟨src ap | tgt _⟩  => '⟨| ap⟩
-        | ⟨tgt _ | src am⟩ => '⟨am |⟩
-        | ⟨tgt _ | tgt _⟩ => ɛ
-        | ⟨src ap |⟩ => '⟨| ap⟩
-        | ⟨tgt _ |⟩ => ɛ
-        | ⟨| src am⟩ => '⟨am |⟩
-        | ⟨| tgt _⟩ => ɛ
-        end
+    | ⟨src ap | src am⟩ => '⟨am | ap⟩
+    | ⟨src ap | tgt _⟩  => '⟨| ap⟩
+    | ⟨tgt _ | src am⟩ => '⟨am |⟩
+    | ⟨tgt _ | tgt _⟩ => ɛ
+    | ⟨src ap |⟩ => '⟨| ap⟩
+    | ⟨tgt _ |⟩ => ɛ
+    | ⟨| src am⟩ => '⟨am |⟩
+    | ⟨| tgt _⟩ => ɛ
     end.
 
-  Definition projR {A B : sig} (ev : Async «A -o B») : Async «B» :=
+  Definition projR {A B : sig} (ev : «A -o B») : Async «B» :=
     match ev with
-    | ɛ => ɛ
-    | vis obs =>
-        match obs with
-        | ⟨tgt bm | tgt bp⟩ => '⟨bm | bp⟩
-        | ⟨tgt bm | src _⟩ => '⟨bm |⟩
-        | ⟨src _ | tgt bp⟩ => '⟨| bp⟩
-        | ⟨src _ | src _⟩ => ɛ
-        | ⟨tgt bm |⟩ => '⟨bm |⟩
-        | ⟨src _ |⟩ => ɛ
-        | ⟨| tgt bp⟩ => '⟨| bp⟩
-        | ⟨| src _⟩ => ɛ
-        end
+    | ⟨tgt bm | tgt bp⟩ => '⟨bm | bp⟩
+    | ⟨tgt bm | src _⟩ => '⟨bm |⟩
+    | ⟨src _ | tgt bp⟩ => '⟨| bp⟩
+    | ⟨src _ | src _⟩ => ɛ
+    | ⟨tgt bm |⟩ => '⟨bm |⟩
+    | ⟨src _ |⟩ => ɛ
+    | ⟨| tgt bp⟩ => '⟨| bp⟩
+    | ⟨| src _⟩ => ɛ
     end.
 
-  (** In certain circumstnces, we will want to match on postive and 
+  (** In certain circumstnces, we will want to match on postive and
     negative events of [A] so we define special notation for that purpose. *)
-  Notation "[ f ]" := (AsyncEvents.Plus.fmap f^- f^+) : event_scope.
-  Notation "[ A ]" := (AsyncEvents.Plus.omap A^- A^+) : event_scope.
+  Notation "[ f ]" := (AsyncEvents.Plus.fmap f^- f^+) : event_hom_scope.
+  Notation "[ A ]" := (AsyncEvents.Plus.omap A^- A^+) : event_obj_scope.
+
+  (** ** Helpers for strategy composition *)
+
+  (** Embed an asynchronous A event from «A -o B» into «A -o C».
+      Only matches the A-only cases; others are unreachable if projR = ɛ *)
+  Definition embed_L {A B C : sig} (ev : «A -o B») (H : projR ev = ɛ) : «A -o C».
+  Proof.
+    destruct ev as [[ap | bm] [am | bp] | [ap | bm] | [am | bp]];
+    simpl in H.
+    - exact ⟨src ap | src am⟩.
+    - exact ⟨src ap |⟩.
+    - exact ⟨| src am⟩.
+    - discriminate H.
+    - exact ⟨src ap |⟩.
+    - discriminate H.
+    - exact ⟨| src am⟩.
+    - discriminate H.
+  Defined.
+
+  (** Embed an asynchronous C event from «B -o C» into «A -o C».
+      Only matches the C-only cases; others are unreachable if projL = ɛ *)
+  Definition embed_R {A B C : sig} (ev : «B -o C») (H : projL ev = ɛ) : «A -o C».
+  Proof.
+    destruct ev as [[bm | cm] [bp | cp] | [bm | cm] | [bp | cp]];
+    simpl in H.
+    - discriminate H.
+    - exact ⟨| tgt cp⟩.
+    - exact ⟨tgt cm |⟩.
+    - exact ⟨tgt cm | tgt cp⟩.
+    - discriminate H.
+    - exact ⟨tgt cm |⟩.
+    - discriminate H.
+    - exact ⟨| tgt cp⟩.
+  Defined.
+
+  (** Does a sync have at least one visible A or C component?
+      Returns true if not a pure sync
+      (pure sync = both evσ and evτ are asynchronous B events) *)
+  Definition has_visible_AC {A B C : sig} (evσ : «A -o B») (evτ : «B -o C») : bool :=
+    match projL evσ, projR evτ with
+    | ɛ, ɛ => false  (* pure sync: no A component, no C component *)
+    | _, _ => true   (* has A component, C component, or both *)
+    end.
 
 End Sig.
