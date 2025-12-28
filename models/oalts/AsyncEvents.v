@@ -209,7 +209,74 @@ End AsyncEventsBicartesian.
 Module AsyncEvents <: BicartesianCategory.
   Include AsyncEventsBicartesian.
 
-    Notation "⟨ a | b ⟩" := (Prod.sync a b) (at level 0).
-    Notation "⟨ a | ⟩" := (Prod.asyncl a) (at level 0).
-    Notation "⟨ | b ⟩" := (Prod.asyncr b) (at level 0).
+  Notation "⟨ a | b ⟩" := (Prod.sync a b) (at level 0).
+  Notation "⟨ a | ⟩" := (Prod.asyncl a) (at level 0).
+  Notation "⟨ | b ⟩" := (Prod.asyncr b) (at level 0).
+
+  Module AsyncF <: Functor SET SET.
+    
+    Definition omap : Type -> Type := Async.
+
+    Definition AsyncF {A B : Type} (f : A -> B) : [A] -> [B] :=
+      fun ev => 
+        match ev with
+        | 'a => '(f a)
+        | ɛ => ɛ
+        end.
+
+    Definition fmap {A B : Type} : (A -> B) -> [A] -> [B] := 
+      AsyncF.
+    
+    Definition fmap_id :
+      forall A, fmap (SET.id A) = SET.id [A].
+    Proof.
+      intros. unfold fmap. extensionality ev.
+      destruct ev; reflexivity.
+    Qed.
+
+    Definition fmap_compose : 
+      forall {A B C} (g : B -> C) (f : A -> B),
+        fmap (SET.compose g f) = SET.compose (fmap g) (fmap f).
+    Proof.
+      intros. unfold fmap. extensionality ev.
+      destruct ev; reflexivity.
+    Qed.
+
+    Include FunctorTheory SET SET.
+  End AsyncF.
+
+  Module Ext <: Functor AsyncEventsBase SET.
+
+    Definition ext {A B : Type} (f : A -> [B]) : [A] -> [B] :=
+      fun ev =>
+        match ev with
+        | 'a => f a
+        | ɛ => ɛ
+        end.
+
+      Definition omap : Type -> Type := Async.
+
+      Definition fmap {A B : Type} : 
+        (A -> [B]) -> [A] -> [B] := ext.
+
+      Definition fmap_id :
+        forall A, fmap (id A) = SET.id ([A]).
+      Proof.
+        intros. unfold fmap, ext. extensionality ev.
+        destruct ev; reflexivity.
+      Qed.
+
+      Definition fmap_compose : 
+        forall {A B C} (g : B -> [C]) (f : A -> [B]),
+          fmap (compose g f) = SET.compose (fmap g) (fmap f).
+      Proof.
+        intros. unfold fmap, ext, compose, SET.compose. extensionality ev.
+        destruct ev as [a | ]; try reflexivity.
+        destruct (f a) as [b | ]; reflexivity.
+      Qed.
+
+      Include FunctorTheory AsyncEventsBase SET.
+
+    End Ext.
+
 End AsyncEvents.
