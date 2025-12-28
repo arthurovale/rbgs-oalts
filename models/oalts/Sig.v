@@ -224,6 +224,32 @@ Module Sig <: BicartesianCategory.
   Delimit Scope event_hom_scope with event_hom.
   Notation "« f »" := (AsyncEvents.Prod.fmap f^- f^+) : event_hom_scope.
   Notation "« A »" := (AsyncEvents.Prod.omap A^- A^+) : event_obj_scope.
+
+  Module ProdF <: Functor SigBaseBicartesian AsyncEvents.
+
+    Open Scope event_hom_scope.
+
+    Definition omap (A : sig) := «A»%event_obj.
+
+    Definition fmap {A B : sig} (f : m A B) := «f».
+
+    Proposition fmap_id :
+      forall A, «id A» = AsyncEvents.id («A»%event_obj).
+    Proof.
+      intros. rewrite AsyncEvents.Prod.fmap_id. reflexivity.
+    Qed.
+
+    Proposition fmap_compose :
+      forall {A B C} (g : m B C) (f : m A B),
+        «(g @ f)» = AsyncEvents.compose «g» «f».
+    Proof.
+      intros. unfold compose; simpl.
+      rewrite AsyncEvents.Prod.fmap_compose. reflexivity.
+    Qed.
+
+    Include FunctorTheory SigBaseBicartesian AsyncEvents.
+  End ProdF.
+
   (** It is worth hashing out what events are available in [«A -o B»].
     
     Every event looks like [⟨x | y⟩] where:
@@ -258,78 +284,113 @@ Module Sig <: BicartesianCategory.
   
   (** At this point, we can define projections of events of [A -o B] to 
     events of [A] and [B] *)
-  Import AsyncEvents.
-  Local Open Scope event_obj_scope.
-  Definition projL {A B : sig} (ev : «A -o B») : Async «A» :=
-    match ev with
-    | ⟨src ap | src am⟩ => '⟨am | ap⟩
-    | ⟨src ap | tgt _⟩  => '⟨| ap⟩
-    | ⟨tgt _ | src am⟩ => '⟨am |⟩
-    | ⟨tgt _ | tgt _⟩ => ɛ
-    | ⟨src ap |⟩ => '⟨| ap⟩
-    | ⟨tgt _ |⟩ => ɛ
-    | ⟨| src am⟩ => '⟨am |⟩
-    | ⟨| tgt _⟩ => ɛ
-    end.
+  Section Projections.
+    Import AsyncEvents.
 
-  Definition projR {A B : sig} (ev : «A -o B») : Async «B» :=
-    match ev with
-    | ⟨tgt bm | tgt bp⟩ => '⟨bm | bp⟩
-    | ⟨tgt bm | src _⟩ => '⟨bm |⟩
-    | ⟨src _ | tgt bp⟩ => '⟨| bp⟩
-    | ⟨src _ | src _⟩ => ɛ
-    | ⟨tgt bm |⟩ => '⟨bm |⟩
-    | ⟨src _ |⟩ => ɛ
-    | ⟨| tgt bp⟩ => '⟨| bp⟩
-    | ⟨| src _⟩ => ɛ
-    end.
+    Local Open Scope event_obj_scope.
+    
+    Definition projL {A B : sig} (ev : «A -o B») : Async «A» :=
+      match ev with
+      | ⟨src ap | src am⟩ => '⟨am | ap⟩
+      | ⟨src ap | tgt _⟩  => '⟨| ap⟩
+      | ⟨tgt _ | src am⟩ => '⟨am |⟩
+      | ⟨tgt _ | tgt _⟩ => ɛ
+      | ⟨src ap |⟩ => '⟨| ap⟩
+      | ⟨tgt _ |⟩ => ɛ
+      | ⟨| src am⟩ => '⟨am |⟩
+      | ⟨| tgt _⟩ => ɛ
+      end.
+
+    Definition projR {A B : sig} (ev : «A -o B») : Async «B» :=
+      match ev with
+      | ⟨tgt bm | tgt bp⟩ => '⟨bm | bp⟩
+      | ⟨tgt bm | src _⟩ => '⟨bm |⟩
+      | ⟨src _ | tgt bp⟩ => '⟨| bp⟩
+      | ⟨src _ | src _⟩ => ɛ
+      | ⟨tgt bm |⟩ => '⟨bm |⟩
+      | ⟨src _ |⟩ => ɛ
+      | ⟨| tgt bp⟩ => '⟨| bp⟩
+      | ⟨| src _⟩ => ɛ
+      end.
+  End Projections.
 
   (** In certain circumstnces, we will want to match on postive and
     negative events of [A] so we define special notation for that purpose. *)
   Notation "[ f ]" := (AsyncEvents.Plus.fmap f^- f^+) : event_hom_scope.
   Notation "[ A ]" := (AsyncEvents.Plus.omap A^- A^+) : event_obj_scope.
 
-  (** ** Helpers for strategy composition *)
+  Module PlusF <: Functor SigBaseBicartesian AsyncEvents.
 
-  (** Embed an asynchronous A event from «A -o B» into «A -o C».
-      Only matches the A-only cases; others are unreachable if projR = ɛ *)
-  Definition embed_L {A B C : sig} (ev : «A -o B») (H : projR ev = ɛ) : «A -o C».
-  Proof.
-    destruct ev as [[ap | bm] [am | bp] | [ap | bm] | [am | bp]];
-    simpl in H.
-    - exact ⟨src ap | src am⟩.
-    - exact ⟨src ap |⟩.
-    - exact ⟨| src am⟩.
-    - discriminate H.
-    - exact ⟨src ap |⟩.
-    - discriminate H.
-    - exact ⟨| src am⟩.
-    - discriminate H.
-  Defined.
+    Open Scope event_hom_scope.
 
-  (** Embed an asynchronous C event from «B -o C» into «A -o C».
-      Only matches the C-only cases; others are unreachable if projL = ɛ *)
-  Definition embed_R {A B C : sig} (ev : «B -o C») (H : projL ev = ɛ) : «A -o C».
-  Proof.
-    destruct ev as [[bm | cm] [bp | cp] | [bm | cm] | [bp | cp]];
-    simpl in H.
-    - discriminate H.
-    - exact ⟨| tgt cp⟩.
-    - exact ⟨tgt cm |⟩.
-    - exact ⟨tgt cm | tgt cp⟩.
-    - discriminate H.
-    - exact ⟨tgt cm |⟩.
-    - discriminate H.
-    - exact ⟨| tgt cp⟩.
-  Defined.
+    Definition omap (A : sig) := [A]%event_obj.
 
-  (** Does a sync have at least one visible A or C component?
-      Returns true if not a pure sync
-      (pure sync = both evσ and evτ are asynchronous B events) *)
-  Definition has_visible_AC {A B C : sig} (evσ : «A -o B») (evτ : «B -o C») : bool :=
-    match projL evσ, projR evτ with
-    | ɛ, ɛ => false  (* pure sync: no A component, no C component *)
-    | _, _ => true   (* has A component, C component, or both *)
-    end.
+    Definition fmap {A B : sig} (f : Sig.m A B) := [f].
+
+    Proposition fmap_id :
+      forall A, [id A] = AsyncEvents.id ([A]%event_obj).
+    Proof.
+      intros. rewrite AsyncEvents.Plus.fmap_id. reflexivity.
+    Qed.
+
+    Proposition fmap_compose :
+      forall {A B C} (g : m B C) (f : m A B),
+        [(g @ f)] = AsyncEvents.compose [g] [f].
+    Proof.
+      intros. unfold compose; simpl.
+      rewrite AsyncEvents.Plus.fmap_compose. reflexivity.
+    Qed.
+
+    Include FunctorTheory SigBaseBicartesian AsyncEvents.
+  End PlusF.
+
+  Section ComposeHelpers.
+    Import AsyncEvents.
+
+    Local Open Scope event_obj_scope.
+    
+    (** ** Helpers for strategy composition *)
+
+    (** Embed an asynchronous A event from «A -o B» into «A -o C».
+        Only matches the A-only cases; others are unreachable if projR = ɛ *)
+    Definition embed_L {A B C : sig} (ev : «A -o B») (H : projR ev = ɛ) : «A -o C».
+    Proof.
+      destruct ev as [[ap | bm] [am | bp] | [ap | bm] | [am | bp]];
+      simpl in H.
+      - exact ⟨src ap | src am⟩.
+      - exact ⟨src ap |⟩.
+      - exact ⟨| src am⟩.
+      - discriminate H.
+      - exact ⟨src ap |⟩.
+      - discriminate H.
+      - exact ⟨| src am⟩.
+      - discriminate H.
+    Defined.
+
+    (** Embed an asynchronous C event from «B -o C» into «A -o C».
+        Only matches the C-only cases; others are unreachable if projL = ɛ *)
+    Definition embed_R {A B C : sig} (ev : «B -o C») (H : projL ev = ɛ) : «A -o C».
+    Proof.
+      destruct ev as [[bm | cm] [bp | cp] | [bm | cm] | [bp | cp]];
+      simpl in H.
+      - discriminate H.
+      - exact ⟨| tgt cp⟩.
+      - exact ⟨tgt cm |⟩.
+      - exact ⟨tgt cm | tgt cp⟩.
+      - discriminate H.
+      - exact ⟨tgt cm |⟩.
+      - discriminate H.
+      - exact ⟨| tgt cp⟩.
+    Defined.
+
+    (** Does a sync have at least one visible A or C component?
+        Returns true if not a pure sync
+        (pure sync = both evσ and evτ are asynchronous B events) *)
+    Definition has_visible_AC {A B C : sig} (evσ : «A -o B») (evτ : «B -o C») : bool :=
+      match projL evσ, projR evτ with
+      | ɛ, ɛ => false  (* pure sync: no A component, no C component *)
+      | _, _ => true   (* has A component, C component, or both *)
+      end.
+  End ComposeHelpers.
 
 End Sig.
