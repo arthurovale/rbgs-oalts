@@ -9,6 +9,7 @@ Module ALTS. (* <: Category. *)
 
   Record alts {A : Type} := {
     states : Type;
+    start : states -> Prop;
     trans :> states -> [A] -> states -> Prop;
   }.
   Arguments alts : clear implicits.
@@ -67,11 +68,11 @@ Module ALTS. (* <: Category. *)
 
     #[local] Hint Resolve alts_simF_mon : paco.
 
-    Definition alts_sim : states σ -> states ρ -> Prop :=
+    Definition alts_sim' : states σ -> states ρ -> Prop :=
       paco2 alts_simF bot2.
 
-    Proposition alts_simF_sim : forall s1 s1',
-      alts_simF alts_sim s1 s1' -> alts_sim s1 s1'.
+    Proposition alts_simF_sim' : forall s1 s1',
+      alts_simF alts_sim' s1 s1' -> alts_sim' s1 s1'.
     Proof.
       intros s1 s1' [Hvis Htau]. pfold. split.
       - intros ev s2 Htrans. specialize (Hvis ev s2 Htrans).
@@ -79,8 +80,8 @@ Module ALTS. (* <: Category. *)
       - intros s2 Htrans. left. apply Htau. exact Htrans.
     Qed.
 
-    Proposition alts_sim_simF : forall s1 s1',
-      alts_sim s1 s1' -> alts_simF alts_sim s1 s1'.
+    Proposition alts_sim'_simF : forall s1 s1',
+      alts_sim' s1 s1' -> alts_simF alts_sim' s1 s1'.
     Proof.
       intros s1 s1' H. punfold H. destruct H as [Hvis Htau]. split.
       - intros ev s2 Htrans. specialize (Hvis ev s2 Htrans).
@@ -90,27 +91,27 @@ Module ALTS. (* <: Category. *)
         destruct Htau; auto. contradiction.
     Qed.
 
-    Lemma alts_sim_tau_star : forall s1 s2 s1',
-      alts_sim s1 s1' -> tau_star σ s1 s2 -> alts_sim s2 s1'.
+    Lemma alts_sim'_tau_star : forall s1 s2 s1',
+      alts_sim' s1 s1' -> tau_star σ s1 s2 -> alts_sim' s2 s1'.
     Proof.
       intros s1 s2 s1' Hsim Hstar.
       induction Hstar.
       - exact Hsim.
-      - apply alts_sim_simF in Hsim as [Hvis Htau].
+      - apply alts_sim'_simF in Hsim as [Hvis Htau].
         apply IHHstar.
         apply Htau. exact H.
     Qed.
 
-  Theorem alts_sim_beh : forall s1 s1',
-    alts_sim s1 s1' -> ssim (beh σ s1) (beh ρ s1').
+  Theorem alts_sim'_beh : forall s1 s1',
+    alts_sim' s1 s1' -> ssim (beh σ s1) (beh ρ s1').
   Proof.
     pcofix CIH.
     intros s1 s1' Hsim.
     pfold. simpl.
     intros [ev [s2 Hweak]]. simpl.
     destruct Hweak as [s3 [Hstar Htrans]].
-    pose proof (alts_sim_tau_star s1 s3 s1' Hsim Hstar) as Hsim'.
-    apply alts_sim_simF in Hsim' as [Hvis Htau].
+    pose proof (alts_sim'_tau_star s1 s3 s1' Hsim Hstar) as Hsim'.
+    apply alts_sim'_simF in Hsim' as [Hvis Htau].
     specialize (Hvis ev s2 Htrans).
     destruct Hvis as [s2' [Hweak2 Hsim'']].
     exists (existT _ ev (exist _ s2' Hweak2)).
@@ -122,5 +123,137 @@ Module ALTS. (* <: Category. *)
   End Sim.
 
   #[export] Hint Resolve alts_simF_mon : paco.
+
+  (** Notation for state-level simulation *)
+  Notation "s1 ≲'[ σ , ρ ] s1'" := (alts_sim' σ ρ s1 s1') (at level 70).
+
+  (** ** State-level simulation properties *)
+
+  Lemma alts_sim'_refl_gen {A : Type} (σ : alts A) (s s' : states σ) :
+    tau_star σ s' s -> alts_sim' σ σ s s'.
+  Proof.
+    revert s s'. pcofix IH. intros s s' Hstar. pfold. split.
+    - intros ev s2 Htrans.
+      exists s2. split.
+      + exists s. split; [exact Hstar | exact Htrans].
+      + right. apply IH. constructor.
+    - intros s2 Htrans.
+      right. apply IH.
+      eapply tau_star_trans; 
+      [exact Hstar | econstructor; [exact Htrans | constructor]].
+  Qed.
+
+  Proposition alts_sim'_refl {A : Type} (σ : alts A) (s : states σ) :
+    alts_sim' σ σ s s.
+  Proof.
+    apply alts_sim'_refl_gen. constructor.
+  Qed.
+
+  Proposition alts_sim'_trans {A : Type} (σ ρ τ : alts A)
+    (s1 : states σ) (s2 : states ρ) (s3 : states τ) :
+    alts_sim' σ ρ s1 s2 -> alts_sim' ρ τ s2 s3 -> alts_sim' σ τ s1 s3.
+  Proof.
+    revert s1 s2 s3. pcofix IH. intros s1 s2 s3 H12 H23.
+    apply alts_sim'_simF in H12 as [Hvis12 Htau12].
+    pfold. split.
+    - intros ev s1' Htrans.
+      specialize (Hvis12 ev s1' Htrans).
+      destruct Hvis12 as [s2' [[s2'' [Hstar12 Htrans12]] Hsim12]].
+      pose proof (alts_sim'_tau_star ρ τ s2 s2'' s3 H23 Hstar12) as H23'.
+      apply alts_sim'_simF in H23' as [Hvis23' Htau23'].
+      specialize (Hvis23' ev s2' Htrans12).
+      destruct Hvis23' as [s3' [Hweak23 Hsim23]].
+      exists s3'. split.
+      + exact Hweak23.
+      + right. eapply IH; eassumption.
+    - intros s1' Htrans.
+      specialize (Htau12 s1' Htrans).
+      right. eapply IH.
+      + exact Htau12.
+      + exact H23.
+  Qed.
+
+  (** State-level bisimulation: mutual simulation *)
+  Definition alts_bisim' {A : Type} (σ ρ : alts A)
+    (s1 : states σ) (s1' : states ρ) : Prop :=
+    alts_sim' σ ρ s1 s1' /\ alts_sim' ρ σ s1' s1.
+
+  Notation "s1 ≈'[ σ , ρ ] s1'" := (alts_bisim' σ ρ s1 s1') (at level 70).
+
+  Proposition alts_bisim'_refl {A : Type} (σ : alts A) (s : states σ) :
+    alts_bisim' σ σ s s.
+  Proof.
+    split; apply alts_sim'_refl.
+  Qed.
+
+  Proposition alts_bisim'_sym {A : Type} (σ ρ : alts A)
+    (s1 : states σ) (s2 : states ρ) :
+    alts_bisim' σ ρ s1 s2 -> alts_bisim' ρ σ s2 s1.
+  Proof.
+    intros [H1 H2]. split; assumption.
+  Qed.
+
+  Proposition alts_bisim'_trans {A : Type} (σ ρ τ : alts A)
+    (s1 : states σ) (s2 : states ρ) (s3 : states τ) :
+    alts_bisim' σ ρ s1 s2 -> alts_bisim' ρ τ s2 s3 -> alts_bisim' σ τ s1 s3.
+  Proof.
+    intros [H12 H21] [H23 H32]. split.
+    - eapply alts_sim'_trans; eassumption.
+    - eapply alts_sim'_trans; eassumption.
+  Qed.
+
+  (** ** System-level simulation *)
+
+  (** System-level simulation: for all start states of σ, exists a simulating start state of ρ *)
+  Definition alts_sim {A : Type} (σ ρ : alts A) : Prop :=
+    forall s1, start σ s1 -> exists s1', start ρ s1' /\ alts_sim' σ ρ s1 s1'.
+
+  Notation "σ ≲ ρ" := (alts_sim σ ρ) (at level 70).
+
+  Proposition alts_sim_refl {A : Type} (σ : alts A) : σ ≲ σ.
+  Proof.
+    intros s Hstart. exists s. split.
+    - exact Hstart.
+    - apply alts_sim'_refl.
+  Qed.
+
+  Proposition alts_sim_trans {A : Type} (σ ρ τ : alts A) :
+    σ ≲ ρ -> ρ ≲ τ -> σ ≲ τ.
+  Proof.
+    intros H12 H23 s1 Hstart1.
+    specialize (H12 s1 Hstart1).
+    destruct H12 as [s2 [Hstart2 Hsim12]].
+    specialize (H23 s2 Hstart2).
+    destruct H23 as [s3 [Hstart3 Hsim23]].
+    exists s3. split.
+    - exact Hstart3.
+    - eapply alts_sim'_trans; eassumption.
+  Qed.
+
+  (** ** System-level bisimulation *)
+
+  Definition alts_bisim {A : Type} (σ ρ : alts A) : Prop :=
+    alts_sim σ ρ /\ alts_sim ρ σ.
+
+  Notation "σ ≈ ρ" := (alts_bisim σ ρ) (at level 70).
+
+  Proposition alts_bisim_refl {A : Type} (σ : alts A) : σ ≈ σ.
+  Proof.
+    split; apply alts_sim_refl.
+  Qed.
+
+  Proposition alts_bisim_sym {A : Type} (σ ρ : alts A) :
+    σ ≈ ρ -> ρ ≈ σ.
+  Proof.
+    intros [H1 H2]. split; assumption.
+  Qed.
+
+  Proposition alts_bisim_trans {A : Type} (σ ρ τ : alts A) :
+    σ ≈ ρ -> ρ ≈ τ -> σ ≈ τ.
+  Proof.
+    intros [H12 H21] [H23 H32]. split.
+    - eapply alts_sim_trans; eassumption.
+    - eapply alts_sim_trans; eassumption.
+  Qed.
 
 End ALTS.
