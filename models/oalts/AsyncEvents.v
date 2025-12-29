@@ -57,11 +57,6 @@ Module AsyncEventsBase <: Category.
     destruct (f ev) as [ev' | ]; reflexivity.
   Qed.
 
-  Proposition unit_unique : forall x y : unit, x = y.
-  Proof.
-    destruct x; destruct y; reflexivity.
-  Qed.
-
   Include CategoryTheory.
 End AsyncEventsBase.
 
@@ -252,7 +247,7 @@ Module AsyncEvents <: BicartesianCategory.
     | ɛ => ɛ
     end.
 
-  Module Ext <: Functor AsyncEventsBase SET.
+  Module Ext <: FaithfulFunctor AsyncEventsBase SET.
       Definition omap : Type -> Type := Async.
 
       Definition fmap {A B : Type} : 
@@ -276,6 +271,24 @@ Module AsyncEvents <: BicartesianCategory.
 
       Include FunctorTheory AsyncEventsBase SET.
 
+      Proposition faithful : forall {A B} 
+        (f g : A -> [B]), ext f = ext g -> f = g. 
+      Proof.
+        intros. extensionality ev. unfold ext in H.
+        apply (f_equal (fun h => h ('ev))) in H.
+        exact H.
+      Qed.
+
+      Proposition ext_vis_eq : forall {A B}
+        {f : A -> [B]} {a : A}, ext f 'a = f a.
+      Proof.
+        reflexivity.
+      Qed.
     End Ext.
+
+    Proposition unit_unique : forall x y : unit, x = y.
+    Proof.
+      destruct x; destruct y; reflexivity.
+    Qed.
 
 End AsyncEvents.
