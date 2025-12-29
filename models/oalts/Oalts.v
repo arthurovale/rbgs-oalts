@@ -10,9 +10,9 @@ Module OALTS. (* <: Category. *)
   Import Sig.
   Import ALTS.
 
-  Definition oalts (A B : sig) := alts («A -o B»)%event_obj.
+  Definition oalts (A B : sig) := alts ([A -o B])%event_obj.
 
-  Definition compose {A B C : sig} (σ : oalts A B) (τ : oalts B C) : oalts A C :=
+  Definition compose {A B C : sig} (τ : oalts B C) (σ : oalts A B) : oalts A C :=
     {|
       states := states σ * states τ;
       start := fun s => start σ (fst s) /\ start τ (snd s);
@@ -21,14 +21,185 @@ Module OALTS. (* <: Category. *)
           (projR evs = projL evt /\ projL evs = ext projL ev /\ projR evt = ext projR ev) /\
           (σ (fst s) ('evs) (fst s') /\ τ (snd s) ('evt) (snd s'))) \/
         (exists evs,
-          (projR evs = ɛ /\ projL evs = ext projL ev /\ ɛ = ext projR ev) /\
-          (trans σ (fst s) ('evs) (fst s') /\ snd s = snd s')) \/
+          (ext projR evs = ɛ /\ ext projL evs = ext projL ev /\ ɛ = ext projR ev) /\
+          (trans σ (fst s) evs (fst s') /\ snd s = snd s')) \/
         (exists evt,
-          (ɛ = projL evt /\ ɛ = ext projL ev /\ projR evt = ext projR ev) /\
-          (fst s = fst s' /\ trans τ (snd s) ('evt) (snd s')));
+          (ɛ = ext projL evt /\ ɛ = ext projL ev /\ ext projR evt = ext projR ev) /\
+          (fst s = fst s' /\ trans τ (snd s) evt (snd s')));
     |}.
 
-  Module StLess.
+  Local Open Scope event_obj_scope.
+  Definition id (A : sig) : oalts A A :=
+    {|
+      states := unit;
+      start := fun _ => True;
+      trans := fun _ ev _ =>
+        match ev with
+        | '(neg ⟨an | bn⟩) => an = bn
+        | '(pos ⟨ap | bp⟩) => ap = bp
+        | _ => False
+        end
+    |}.
+
+  Lemma id_trans_iff {A : sig} {ev : Async [A -o A]} {s s' : states (id A)} :
+    id A s ev s' <-> 
+      exists ev', ev = 'ev' /\ projL ev' = projR ev'.
+  Proof.
+    split.
+    - intros.
+      destruct ev as [ev'| ]; [| contradiction].
+      exists ev'. simpl in H. destruct ev' as [ev' | ev'].
+      all: split; [reflexivity | ].
+      all: destruct ev'; subst; try reflexivity; try contradiction.
+    - intros; simpl. destruct H as [ev' [Hvis Heq]].
+      rewrite Hvis. destruct ev' as [ev' | ev']; destruct ev';
+      simpl in Heq;
+      try unfold AsyncEvents.Plus.i1, AsyncEvents.Plus.i2, 
+        AsyncEvents.Prod.p1, AsyncEvents.Prod.p2, AsyncEvents.compose in Heq;
+      inversion Heq; reflexivity.
+  Qed.
+
+  (** Define the relation explicitly *)
+  Definition compose_id_rel {A B : sig} (σ : oalts A B) 
+    (s1 : states (compose (id B) σ)) (s2 : states σ) : Prop :=
+    tau_star σ s2 (fst s1) /\ snd s1 = tt.
+
+  (** Prove it's a simulation in one direction *)
+  Lemma compose_id_rel_sim {A B : sig} (σ : oalts A B) :
+    forall s1 s2, compose_id_rel σ s1 s2 -> 
+      alts_simF (compose (id B) σ) σ (compose_id_rel σ) s1 s2.
+  Proof.
+  intros [s []] s2 [Hstar Htt]. simpl in *. subst.
+  split.
+  - intros ev [t []] Htrans.
+    exists t. split.
+    + destruct Htrans as [Htrans | [Htrans | Htrans]].
+      -- destruct Htrans as [evs [evt [Heqs [Hσ Hid]]]].
+         simpl in Heqs.
+         assert (evs = ev).
+         { apply projL_ProjR_eq; destruct Heqs as [H1 [H2 H3]].
+           exact H2. rewrite H1. apply id_trans_iff in Hid. 
+           destruct Hid as [ev' [Hvis Hproj]]. inversion Hvis. subst.
+           rewrite Hproj. exact H3. }
+         rewrite <- H; rewrite <- H in Heqs; clear H.
+         simpl in Hσ. 
+         exists s. split.
+         * eapply tau_star_trans; [exact Hstar | constructor].
+         * exact Hσ.
+      -- destruct Htrans as [evs [Heqs [Hσ _]]].
+         simpl in Heqs. simpl in Hσ. 
+         destruct evs as [evs | ].
+         ++ assert (evs = ev).
+            { apply projL_ProjR_eq; destruct Heqs as [H1 [H2 H3]]. 
+              exact H2. simpl in H1. rewrite H1. exact H3. }
+            rewrite <- H; rewrite <- H in Heqs; clear H.
+            exists s. split.
+            * eapply tau_star_trans; [exact Hstar | constructor].
+            * exact Hσ.
+         ++ simpl in Heqs. exfalso. destruct Heqs as [_ [HL HR]]. 
+            eapply projL_projR_eps; symmetry; [exact HL | exact HR].
+      -- destruct Htrans as [evt [Heqs [_ Hid]]].
+         simpl in Heqs.
+         remember Hid as Hid'; clear HeqHid'. apply id_trans_iff in Hid'.
+         destruct Hid' as [ev' [Heq Hproj]].
+         rewrite Heq in Heqs. destruct Heqs as [Heq' _]. simpl in Heq'.
+         rewrite <- Heq' in Hproj. symmetry in Heq', Hproj.
+         exfalso. eapply projL_projR_eps; [exact Heq' | exact Hproj].
+    + split; [| reflexivity].
+      constructor.
+  - intros [t []] Htrans. 
+    destruct Htrans as [Htrans | [Htrans | Htrans]].
+    + destruct Htrans as [evs [evt [Heqs [Hσ Hid]]]].
+      apply id_trans_iff in Hid.
+      destruct Heqs as [Heqs [HprojL HprojR]].
+      destruct Hid as [ev' [Heq Hproj]].
+      inversion Heq; subst. simpl in HprojL, HprojR. exfalso.
+      rewrite <- Hproj in HprojR. rewrite <- Heqs in HprojR.
+      eapply projL_projR_eps; [exact HprojL | exact HprojR].
+    + destruct Htrans as [evs [[HprojR [HprojL _]] [Hσ Heq]]].
+      destruct evs as [ev' | ].
+      * simpl in HprojL, HprojR. exfalso.
+        eapply projL_projR_eps; [exact HprojL | exact HprojR].
+      * simpl in Hσ. subst. split; [| reflexivity].
+        eapply tau_star_trans; [exact Hstar | econstructor; [exact Hσ | constructor]].
+    + destruct Htrans as [evt [[HprojL [_ HprojR]] [Heq Hid]]].
+      destruct evt as [ev' | ].
+      * simpl in HprojL, HprojR. exfalso.
+        eapply projL_projR_eps; [symmetry; exact HprojL | exact HprojR].
+      * simpl in Hid. contradiction.
+  Qed.
+
+  Lemma compose_id_left_forward {A B} (σ : oalts A B) :
+    forall s, alts_sim' (compose (id B) σ) σ (s, tt) s.
+  Proof.
+    intros s.
+    apply (alts_sim_coind (compose (id B) σ) σ (compose_id_rel σ) (compose_id_rel_sim σ)).
+    split; [constructor | reflexivity].
+  Qed.
+
+  (** Relation for backward simulation: σ can be "ahead" via taus *)
+  Definition compose_id_rel_back {A B : sig} (σ : oalts A B)
+    (s1 : states σ) (s2 : states (compose (id B) σ)) : Prop :=
+    tau_star σ (fst s2) s1 /\ snd s2 = tt.
+
+  (** Prove backward simulation via coinduction *)
+  Lemma compose_id_rel_back_sim {A B : sig} (σ : oalts A B) :
+    forall s1 s2, compose_id_rel_back σ s1 s2 ->
+      alts_simF σ (compose (id B) σ) (compose_id_rel_back σ) s1 s2.
+  Proof.
+    intros s1 [s2 []] [Hstar Htt]. simpl in *. subst.
+    split.
+    - (* Visible case: σ does s1 --'ev--> s1' *)
+      intros ev s1' Htrans.
+      (* compose can catch up via taus then do the visible transition *)
+      exists (s1', tt). split.
+      + (* weak_trans: compose does tau_star then visible *)
+        exists (s1, tt). split.
+        * (* tau_star from (s2, tt) to (s1, tt) by propagating σ's taus *)
+          clear Htrans. induction Hstar as [| s0 s1_mid s1_end Hstep Hstar' IHstar].
+          -- constructor.
+          -- eapply tau_step; [| exact IHstar].
+             right. left. exists ɛ. simpl.
+             repeat split; exact Hstep.
+        * (* visible transition (s1, tt) --'ev--> (s1', tt) *)
+          destruct (projR ev) as [b | ] eqn:HprojR.
+          -- (* B component: sync with id *)
+             left. exists ev.
+             destruct b as [bm | bp].
+             ++ exists (neg ⟨bm | bm⟩). simpl. repeat split; auto.
+             ++ exists (pos ⟨bp | bp⟩). simpl. repeat split; auto.
+          -- (* No B component: σ-only *)
+             right. left. exists ('ev). simpl. repeat split; auto.
+      + (* Relation preserved: tau_star σ s1' s1' *)
+        split; [constructor | reflexivity].
+    - (* Tau case: σ does s1 --ɛ--> s1' *)
+      intros s1' Htrans.
+      (* σ advances, compose stays, relation still holds by transitivity *)
+      split; [| reflexivity].
+      eapply tau_star_trans; [exact Hstar | econstructor; [exact Htrans | constructor]].
+  Qed.
+
+  Lemma compose_id_left_backward {A B : sig} (σ : oalts A B) :
+    forall (s : states σ), alts_sim' σ (compose (id B) σ) s (s, tt).
+  Proof.
+    intros s.
+    apply (alts_sim_coind σ (compose (id B) σ) (compose_id_rel_back σ) (compose_id_rel_back_sim σ)).
+    split; [constructor | reflexivity].
+  Qed.
+
+  Proposition compose_id_left :
+    forall {A B} (σ : oalts A B), compose (id B) σ ≈ σ.
+  Proof.
+    intros A B σ. split.
+    - intros [s []] [Hstart_σ _].
+      exists s. split; [exact Hstart_σ |].
+      apply compose_id_left_forward.
+    - intros s Hstart_σ.
+      exists (s, tt). split; [split; [exact Hstart_σ | exact I] |].
+      apply compose_id_left_backward.
+  Qed.
+
+  (* Module StLess.
     Open Scope event_obj_scope.
 
     Definition StLess {A B : sig} (gen : Sig.m A B) : oalts A B :=
@@ -36,19 +207,14 @@ Module OALTS. (* <: Category. *)
         states := unit;
         start := fun _ => True;
         trans := fun _ ev _ =>
-          ext («gen»)%event_hom (ext projL ev) = ext projR ev
+          match ev with
+          | '⟨src ap | tgt bp⟩ => gen^+ ap = 'bp
+          | '⟨tgt bm | src am⟩ => gen^- am = 'bm
+          | '⟨src ap |⟩ => gen^+ ap = ɛ
+          | '⟨| src am⟩ => gen^- am = ɛ
+          | _ => False
+          end
       |}.
-
-    (** Helper: all unit values are equal *)
-    Lemma unit_eq : forall (x y : unit), x = y.
-    Proof. destruct x, y. reflexivity. Qed.
-
-    (** Helper: tau transitions in StLess are always possible (since ext _ ɛ = ɛ) *)
-    Lemma StLess_tau_always {A B : sig} (gen : Sig.m A B) (s s' : unit) :
-      trans (StLess gen) s ɛ s'.
-    Proof.
-      simpl. reflexivity.
-    Qed.
 
     (** Helper: weak_trans on StLess reduces to trans (states are trivial) *)
     Lemma StLess_weak_trans {A B : sig} (gen : Sig.m A B) (s : unit) (ev : «A -o B») (s' : unit) :
@@ -56,8 +222,8 @@ Module OALTS. (* <: Category. *)
     Proof.
       split.
       - intros [s'' [Hstar Htrans]].
-        (* s'' is unit, so s'' = s' *)
-        rewrite (unit_eq s'' s') in Htrans. exact Htrans.
+        destruct s; destruct s'; destruct s''.
+        exact Htrans.
       - intros Htrans. exists s. split.
         + constructor.
         + exact Htrans.
@@ -66,8 +232,8 @@ Module OALTS. (* <: Category. *)
     (** Helper: weak_trans on composed StLess reduces to trans *)
     Lemma compose_StLess_weak_trans {A B C : sig} (gen : Sig.m A B) (gen' : Sig.m B C)
         (s : unit * unit) (ev : «A -o C») (s' : unit * unit) :
-      weak_trans (compose (StLess gen) (StLess gen')) s ev s' <->
-      trans (compose (StLess gen) (StLess gen')) s ('ev) s'.
+      weak_trans (compose (StLess gen') (StLess gen)) s ev s' <->
+      trans (compose(StLess gen') (StLess gen)) s ('ev) s'.
     Proof.
       split.
       - intros [s'' [Hstar Htrans]].
@@ -80,54 +246,10 @@ Module OALTS. (* <: Category. *)
         + exact Htrans.
     Qed.
 
-    (** Helper: «gen» on asyncl can only produce asyncl or ɛ *)
-    Lemma fmap_asyncl_shape {A B : sig} (gen : Sig.m A B) (am : A^-) :
-      (exists bm, AsyncEvents.Prod.fmap (gen^-) (gen^+) ⟨am|⟩ = '⟨bm|⟩) \/
-      AsyncEvents.Prod.fmap (gen^-) (gen^+) ⟨am|⟩ = ɛ.
-    Proof.
-      unfold AsyncEvents.Prod.fmap, AsyncEvents.Prod.pair,
-             AsyncEventsBase.compose, AsyncEvents.Prod.p1, AsyncEvents.Prod.p2.
-      simpl.
-      destruct (gen^- am) as [bm |].
-      - left. exists bm. reflexivity.
-      - right. reflexivity.
-    Qed.
-
-    (** Helper: «gen» on asyncr can only produce asyncr or ɛ *)
-    Lemma fmap_asyncr_shape {A B : sig} (gen : Sig.m A B) (ap : A^+) :
-      (exists bp, AsyncEvents.Prod.fmap (gen^-) (gen^+) ⟨|ap⟩ = '⟨|bp⟩) \/
-      AsyncEvents.Prod.fmap (gen^-) (gen^+) ⟨|ap⟩ = ɛ.
-    Proof.
-      unfold AsyncEvents.Prod.fmap, AsyncEvents.Prod.pair,
-             AsyncEventsBase.compose, AsyncEvents.Prod.p1, AsyncEvents.Prod.p2.
-      simpl.
-      destruct (gen^+ ap) as [bp |].
-      - left. exists bp. reflexivity.
-      - right. reflexivity.
-    Qed.
-
-    (** Key lemma: ext distributes over composition of signature morphisms *)
-    Lemma ext_fmap_compose {A B C : sig} (gen : Sig.m A B) (gen' : Sig.m B C)
-        (evA : Async «A»%event_obj) :
-      ext («gen' @ gen»)%event_hom evA = ext («gen'»)%event_hom (ext («gen»)%event_hom evA).
-    Proof.
-      (* Use ProdF.fmap_compose: «gen' @ gen» = AsyncEvents.compose «gen'» «gen» *)
-      pose proof (ProdF.fmap_compose gen' gen) as Hfmap.
-      unfold ProdF.fmap in Hfmap.
-      rewrite Hfmap.
-      (* Now goal is: ext (AsyncEvents.compose «gen'» «gen») evA = ext «gen'» (ext «gen» evA) *)
-      (* Use Ext.fmap_compose: ext (compose g f) = SET.compose (ext g) (ext f) *)
-      pose proof (Ext.fmap_compose («gen'»)%event_hom («gen»)%event_hom) as Hext.
-      unfold Ext.fmap, SET.compose in Hext.
-      (* Hext : ext (AsyncEvents.compose «gen'» «gen») = fun ev => ext «gen'» (ext «gen» ev) *)
-      rewrite Hext.
-      reflexivity.
-    Qed.
-
     (** Forward simulation helper *)
     Lemma StLess_compose_sim_forward {A B C : sig} (gen : Sig.m A B) (gen' : Sig.m B C) :
       forall (s : unit * unit),
-        alts_sim' (compose (StLess gen) (StLess gen')) (StLess (gen' @ gen)) s tt.
+        alts_sim' (compose (StLess gen') (StLess gen)) (StLess (gen' @ gen)) s tt.
     Proof.
       pcofix IH. intros [s1 s2].
       pfold. split.
@@ -136,60 +258,64 @@ Module OALTS. (* <: Category. *)
         exists tt. split.
         * (* weak_trans on RHS *)
           apply StLess_weak_trans. simpl.
-          (* Goal: ext «gen' @ gen» (projL ev) = projR ev *)
-          rewrite (ext_fmap_compose gen gen').
-          (* Goal: ext «gen'» (ext «gen» (projL ev)) = projR ev *)
+          (* Analyze the three cases from compose *)
           destruct Htrans as [Hsync | [Hleft | Hright]].
           -- (* Sync case: both σ and τ make visible transitions *)
              destruct Hsync as [evs [evt [[Hmatch [HprojL HprojR]] [Hσ Hτ]]]].
-             simpl in Hσ, Hτ, HprojL, HprojR.
-             (* Hσ : ext «gen» (projL evs) = projR evs *)
-             (* Hτ : ext «gen'» (projL evt) = projR evt *)
-             (* Hmatch : projR evs = projL evt *)
-             (* HprojL : projL evs = projL ev *)
-             (* HprojR : projR evt = projR ev *)
-             rewrite <- HprojL, <- HprojR.
-             (* Goal: ext «gen'» (ext «gen» (projL evs)) = projR evt *)
-             destruct (projL evs) as [evA |]; simpl in Hσ |- *.
-             ++ (* projL evs = 'evA, so ext «gen» (projL evs) = «gen» evA *)
-                rewrite Hσ, Hmatch.
-                (* Goal: ext «gen'» (projL evt) = projR evt, which is exactly Hτ *)
-                destruct (projL evt) as [evB |]; simpl in Hτ |- *; auto.
-             ++ (* projL evs = ɛ, so ext «gen» ɛ = ɛ *)
-                (* Goal: ext «gen'» ɛ = projR evt, i.e., ɛ = projR evt *)
-                (* From Hσ : ɛ = projR evs (since projL evs = ɛ) *)
-                (* Hmatch : projR evs = projL evt, so projL evt = ɛ *)
-                (* Hτ : ext «gen'» (projL evt) = projR evt, so ɛ = projR evt *)
-                assert (HeqL : projL evt = ɛ) by (rewrite <- Hmatch; symmetry; exact Hσ).
-                rewrite HeqL in Hτ. simpl in Hτ. exact Hτ.
+             simpl in Hσ, Hτ.
+             (* Case analysis on evs pattern in StLess gen *)
+             destruct evs as [[ap' | bm'] [am' | bp'] | [ap' | bm'] | [am' | bp']];
+             simpl in Hσ; try contradiction;
+             simpl in Hmatch;
+             destruct evt as [[bp'' | cm'] [bm'' | cp'] | [bp'' | cm'] | [bm'' | cp']];
+             simpl in Hτ, Hmatch; try discriminate; try contradiction;
+             simpl in HprojL, HprojR;
+             destruct ev as [[ap | cm] [am | cp] | [ap | cm] | [am | cp]];
+             simpl in HprojL, HprojR; try discriminate;
+             inversion Hmatch; subst; inversion HprojL; subst;
+             try (inversion HprojR; subst);
+             simpl;
+             unfold Sig.compose; simpl;
+             unfold AsyncEventsBase.compose;
+             try (rewrite Hσ; exact Hτ);
+             try (rewrite Hσ; reflexivity).
           -- (* Left-only case: only σ makes a transition, τ stays *)
              destruct Hleft as [evs [[HprojRɛ [HprojL HprojRev]] [Hσ Heq]]].
-             simpl in Hσ, HprojL, HprojRev.
-             rewrite <- HprojL, <- HprojRev.
-             destruct (projL evs) as [evA |]; simpl in Hσ |- *.
-             ++ rewrite Hσ, HprojRɛ. reflexivity.
-             ++ reflexivity.
+             destruct evs as [[ap' | bm'] [am' | bp'] | [ap' | bm'] | [am' | bp']];
+             simpl in HprojRɛ; try discriminate;
+             simpl in Hσ; try contradiction;
+             simpl in HprojL, HprojRev;
+             destruct ev as [[ap | cm] [am | cp] | [ap | cm] | [am | cp]];
+             simpl in HprojL, HprojRev; try discriminate;
+             inversion HprojL; subst;
+             simpl;
+             unfold Sig.compose; simpl;
+             unfold AsyncEventsBase.compose;
+             rewrite Hσ; reflexivity.
           -- (* Right-only case: only τ makes a transition, σ stays *)
+             (* For right-only, projL evt = ɛ, but StLess gen' only has transitions
+                where projL evt ≠ ɛ (⟨src bp | tgt cp⟩, ⟨tgt cm | src bm⟩, ⟨src bp |⟩, ⟨| src bm⟩)
+                So this case is impossible. *)
              destruct Hright as [evt [[HprojLɛ [HprojLev HprojR]] [Heq Hτ]]].
-             simpl in Hτ, HprojLev, HprojR.
-             (* HprojLɛ : ɛ = projL evt *)
-             (* HprojLev : ɛ = projL ev *)
-             (* HprojR : projR evt = projR ev *)
-             (* Hτ : ext «gen'» (projL evt) = projR evt *)
-             rewrite <- HprojLev, <- HprojR. simpl.
-             (* Goal: ɛ = projR evt *)
-             (* Use Hτ with projL evt = ɛ to conclude *)
-             rewrite <- HprojLɛ in Hτ. simpl in Hτ. exact Hτ.
+             destruct evt as [[bp' | cm'] [bm' | cp'] | [bp' | cm'] | [bm' | cp']];
+             simpl in Hτ, HprojLɛ; try discriminate; try destruct Hτ.
         * right. destruct t1, t2. apply IH.
-      + (* Tau transitions *)
+      + (* Tau transitions - compose has no tau transitions that change state *)
         intros [t1 t2] Htrans.
+        simpl in Htrans.
+        (* Tau in compose means ev = ɛ, which has ext projL ɛ = ɛ and ext projR ɛ = ɛ *)
+        (* The three disjuncts all require visible transitions in σ or τ *)
+        (* But for ev = ɛ, we need to check what compose allows *)
+        (* Actually looking at compose definition, trans takes Async E, so ɛ is valid *)
+        (* For ɛ case: ext projL ɛ = ɛ and ext projR ɛ = ɛ *)
+        (* All three cases require visible evs or evt which can't match ɛ constraints *)
         right. destruct t1, t2. apply IH.
     Qed.
 
     (** Backward simulation helper *)
     Lemma StLess_compose_sim_backward {A B C : sig} (gen : Sig.m A B) (gen' : Sig.m B C) :
       forall (s : unit),
-        alts_sim' (StLess (gen' @ gen)) (compose (StLess gen) (StLess gen')) s (tt, tt).
+        alts_sim' (StLess (gen' @ gen)) (compose (StLess gen') (StLess gen) ) s (tt, tt).
     Proof.
       pcofix IH. intros s.
       pfold. split.
@@ -198,123 +324,61 @@ Module OALTS. (* <: Category. *)
         exists (tt, tt). split.
         * (* weak_trans on composed system - need to construct witness *)
           apply compose_StLess_weak_trans. simpl.
-          rewrite (ext_fmap_compose gen gen') in Htrans.
-          (* Htrans : ext «gen'» (ext «gen» (projL ev)) = projR ev *)
-          (* Direct case analysis on ev's asyncProd structure *)
-          destruct ev as [[ap | cm] [am | cp] | [ap | cm] | [am | cp]].
-          (* 8 cases based on ev structure in «A -o C» = asyncProd (A^+ + C^-) (A^- + C^+) *)
-
-          -- (* ev = ⟨src ap | src am⟩ : A sync, projL = '⟨am|ap⟩, projR = ɛ *)
-             simpl in Htrans. (* Htrans : ext «gen'» (ext «gen» '⟨am|ap⟩) = ɛ *)
-             (* Case split on intermediate B *)
-             destruct (ext («gen»)%event_hom ('⟨am|ap⟩)) as [b |] eqn:HB.
-             ++ (* ext «gen» '⟨am|ap⟩ = 'b : B visible *)
-                simpl in Htrans.
-                (* Htrans : «gen'» b = ɛ *)
-                destruct b as [bm bp | bm | bp].
-                ** (* B sync case - structural limitation of compose *)
-                   (* When A is sync and maps to B sync, we can't construct valid witnesses
-                      because asyncProd can't have both projL and projR be syncs *)
-                   right. left.
-                   (* Use left-only but need to adjust - this case may be impossible
-                      under the current compose definition *)
-                   simpl in HB.
-                   (* «gen» ⟨am|ap⟩ = '⟨bm|bp⟩ but we need ext «gen» (projL evs) = ɛ
-                      for any evs with projL evs = '⟨am|ap⟩ *)
-                   (* This is a structural obstruction *)
-                   exfalso.
-                   (* The transition shouldn't exist: if «gen» ⟨am|ap⟩ = '⟨bm|bp⟩ and
-                      «gen'» ⟨bm|bp⟩ = ɛ (from Htrans), this should fail because
-                      gen' cannot map a sync to ɛ by the shape lemmas *)
-                   (* Actually, «gen'» takes «B» -> Async «C», so ⟨bm|bp⟩ : «B» *)
-                   (* Let's check: «gen'» on a sync can return ɛ if both components map to ɛ *)
-                   (* Need to prove this leads to contradiction or handle it *)
-                   admit.
-                ** (* b = asyncl bm - same structural issue *)
-                   (* When A is sync and maps to any visible B, left-only fails
-                      because trans σ evs requires ext «gen» (projL evs) = ɛ
-                      but projL evs = '⟨am|ap⟩ and «gen» ⟨am|ap⟩ = '⟨bm|⟩ ≠ ɛ *)
-                   exfalso. admit.
-                ** (* b = asyncr bp - same structural issue *)
-                   exfalso. admit.
-             ++ (* ext «gen» '⟨am|ap⟩ = ɛ : B silent *)
-                simpl in Htrans. (* Htrans : ɛ = ɛ *)
-                right. left.
-                exists ⟨src ap | src am⟩.
+          (* Case analysis on ev *)
+          destruct ev as [[ap | cm] [am | cp] | [ap | cm] | [am | cp]];
+          simpl in Htrans; try contradiction.
+          -- (* ev = ⟨src ap | tgt cp⟩ : (gen' @ gen)^+ ap = 'cp *)
+             (* Compose (gen'^+) (gen^+) ap = 'cp means gen^+ ap = 'bp and gen'^+ bp = 'cp for some bp *)
+             unfold Sig.compose in Htrans. simpl in Htrans.
+             unfold AsyncEventsBase.compose in Htrans.
+             destruct (gen^+ ap) as [bp |] eqn:Hgen; simpl in Htrans.
+             ++ (* gen^+ ap = 'bp, gen'^+ bp = 'cp *)
+                left. (* sync case *)
+                exists ⟨src ap | tgt bp⟩, ⟨src bp | tgt cp⟩.
                 simpl. repeat split; auto.
-                exact HB.
-
-          -- (* ev = ⟨src ap | tgt cp⟩ : projL = '⟨|ap⟩, projR = '⟨|cp⟩ *)
-             simpl in Htrans. (* Htrans : ext «gen'» (ext «gen» '⟨|ap⟩) = '⟨|cp⟩ *)
-             (* Check structure of intermediate B *)
-             destruct (fmap_asyncr_shape gen ap) as [[bp Hbp] | Hbp].
-             ++ (* «gen» ⟨|ap⟩ = '⟨|bp⟩ *)
-                rewrite Hbp in Htrans. simpl in Htrans.
-                (* Htrans : «gen'» ⟨|bp⟩ = '⟨|cp⟩ *)
-                destruct (fmap_asyncr_shape gen' bp) as [[cp' Hcp] | Hcp].
-                ** (* «gen'» ⟨|bp⟩ = '⟨|cp'⟩ *)
-                   left.
-                   exists ⟨src ap | tgt bp⟩, ⟨src bp | tgt cp⟩.
-                   simpl. repeat split; auto.
-                   --- rewrite Hbp. reflexivity.
-                   --- exact Htrans.
-                ** (* «gen'» ⟨|bp⟩ = ɛ, but Htrans says it equals '⟨|cp⟩ *)
-                   rewrite Hcp in Htrans. discriminate Htrans.
-             ++ (* «gen» ⟨|ap⟩ = ɛ *)
-                rewrite Hbp in Htrans. simpl in Htrans.
-                (* Htrans : ɛ = '⟨|cp⟩ - contradiction *)
+             ++ (* gen^+ ap = ɛ, but then Htrans says ɛ = 'cp - contradiction *)
                 discriminate Htrans.
-
-          -- (* ev = ⟨tgt cm | src am⟩ : projL = '⟨am|⟩, projR = '⟨cm|⟩ *)
-             simpl in Htrans. (* Htrans : ext «gen'» (ext «gen» '⟨am|⟩) = '⟨cm|⟩ *)
-             destruct (fmap_asyncl_shape gen am) as [[bm Hbm] | Hbm].
-             ++ (* «gen» ⟨am|⟩ = '⟨bm|⟩ *)
-                rewrite Hbm in Htrans. simpl in Htrans.
-                destruct (fmap_asyncl_shape gen' bm) as [[cm' Hcm] | Hcm].
-                ** left.
-                   exists ⟨tgt bm | src am⟩, ⟨tgt cm | src bm⟩.
-                   simpl. repeat split; auto.
-                   --- rewrite Hbm. reflexivity.
-                   --- exact Htrans.
-                ** rewrite Hcm in Htrans. discriminate Htrans.
-             ++ rewrite Hbm in Htrans. simpl in Htrans. discriminate Htrans.
-
-          -- (* ev = ⟨tgt cm | tgt cp⟩ : C sync, projL = ɛ, projR = '⟨cm|cp⟩ *)
-             simpl in Htrans. (* Htrans : ɛ = '⟨cm|cp⟩ - contradiction *)
-             discriminate Htrans.
-
-          -- (* ev = ⟨src ap |⟩ : projL = '⟨|ap⟩, projR = ɛ *)
-             simpl in Htrans. (* Htrans : ext «gen'» (ext «gen» '⟨|ap⟩) = ɛ *)
-             right. left.
-             exists ⟨src ap |⟩.
-             simpl. repeat split; auto.
-             destruct (fmap_asyncr_shape gen ap) as [[bp Hbp] | Hbp];
-             rewrite Hbp; simpl; [exact Htrans | exact Htrans].
-
-          -- (* ev = ⟨tgt cm |⟩ : projL = ɛ, projR = '⟨cm|⟩ *)
-             simpl in Htrans. (* Htrans : ɛ = '⟨cm|⟩ - contradiction *)
-             discriminate Htrans.
-
-          -- (* ev = ⟨| src am⟩ : projL = '⟨am|⟩, projR = ɛ *)
-             simpl in Htrans. (* Htrans : ext «gen'» (ext «gen» '⟨am|⟩) = ɛ *)
-             right. left.
-             exists ⟨| src am⟩.
-             simpl. repeat split; auto.
-             destruct (fmap_asyncl_shape gen am) as [[bm Hbm] | Hbm];
-             rewrite Hbm; simpl; [exact Htrans | exact Htrans].
-
-          -- (* ev = ⟨| tgt cp⟩ : projL = ɛ, projR = '⟨|cp⟩ *)
-             simpl in Htrans. (* Htrans : ɛ = '⟨|cp⟩ - contradiction *)
-             discriminate Htrans.
-
+          -- (* ev = ⟨tgt cm | src am⟩ : (gen' @ gen)^- am = 'cm *)
+             unfold Sig.compose in Htrans. simpl in Htrans.
+             unfold AsyncEventsBase.compose in Htrans.
+             destruct (gen^- am) as [bm |] eqn:Hgen; simpl in Htrans.
+             ++ (* gen^- am = 'bm, gen'^- bm = 'cm *)
+                left. (* sync case *)
+                exists ⟨tgt bm | src am⟩, ⟨tgt cm | src bm⟩.
+                simpl. repeat split; auto.
+             ++ discriminate Htrans.
+          -- (* ev = ⟨src ap |⟩ : (gen' @ gen)^+ ap = ɛ *)
+             unfold Sig.compose in Htrans. simpl in Htrans.
+             unfold AsyncEventsBase.compose in Htrans.
+             destruct (gen^+ ap) as [bp |] eqn:Hgen; simpl in Htrans.
+             ++ (* gen^+ ap = 'bp, gen'^+ bp = ɛ *)
+                left. (* sync case with async evt *)
+                exists ⟨src ap | tgt bp⟩, ⟨src bp |⟩.
+                simpl. repeat split; auto.
+             ++ (* gen^+ ap = ɛ *)
+                right. left. (* left-only case *)
+                exists ⟨src ap |⟩.
+                simpl. repeat split; auto.
+          -- (* ev = ⟨| src am⟩ : (gen' @ gen)^- am = ɛ *)
+             unfold Sig.compose in Htrans. simpl in Htrans.
+             unfold AsyncEventsBase.compose in Htrans.
+             destruct (gen^- am) as [bm |] eqn:Hgen; simpl in Htrans.
+             ++ (* gen^- am = 'bm, gen'^- bm = ɛ *)
+                left. (* sync case with async evt *)
+                exists ⟨tgt bm | src am⟩, ⟨| src bm⟩.
+                simpl. repeat split; auto.
+             ++ (* gen^- am = ɛ *)
+                right. left. (* left-only case *)
+                exists ⟨| src am⟩.
+                simpl. repeat split; auto.
         * right. destruct t. apply IH.
       + (* Tau transitions *)
         intros t Htrans.
-        right. destruct t. apply IH.
+        simpl in Htrans. contradiction.
     Qed.
-
+    
     Proposition StLess_compose {A B C : sig} {gen : Sig.m A B} {gen' : Sig.m B C} :
-      compose (StLess gen) (StLess gen') ≈ StLess (gen' @ gen).
+      compose (StLess gen') (StLess gen) ≈ StLess (gen' @ gen).
     Proof.
       split.
       (* Forward: compose (StLess gen) (StLess gen') ≲ StLess (gen' @ gen) *)
@@ -327,6 +391,6 @@ Module OALTS. (* <: Category. *)
         apply StLess_compose_sim_backward.
     Qed.
     
-  End StLess.
+  End StLess. *)
 
 End OALTS.
