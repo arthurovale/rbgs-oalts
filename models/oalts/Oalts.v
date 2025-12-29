@@ -59,145 +59,133 @@ Module OALTS. (* <: Category. *)
       inversion Heq; reflexivity.
   Qed.
 
-  (** Define the relation explicitly *)
-  Definition compose_id_rel {A B : sig} (σ : oalts A B) 
-    (s1 : states (compose (id B) σ)) (s2 : states σ) : Prop :=
-    tau_star σ s2 (fst s1) /\ snd s1 = tt.
+  Section Compose_Id_Left.
+    (** Define the relation explicitly *)
+    Definition compose_id_rel {A B : sig} (σ : oalts A B) 
+      (s1 : states (compose (id B) σ)) (s2 : states σ) : Prop :=
+      tau_star σ s2 (fst s1) /\ snd s1 = tt.
 
-  (** Prove it's a simulation in one direction *)
-  Lemma compose_id_rel_sim {A B : sig} (σ : oalts A B) :
-    forall s1 s2, compose_id_rel σ s1 s2 -> 
-      alts_simF (compose (id B) σ) σ (compose_id_rel σ) s1 s2.
-  Proof.
-  intros [s []] s2 [Hstar Htt]. simpl in *. subst.
-  split.
-  - intros ev [t []] Htrans.
-    exists t. split.
-    + destruct Htrans as [Htrans | [Htrans | Htrans]].
-      -- destruct Htrans as [evs [evt [Heqs [Hσ Hid]]]].
-         simpl in Heqs.
-         assert (evs = ev).
-         { apply projL_ProjR_eq; destruct Heqs as [H1 [H2 H3]].
-           exact H2. rewrite H1. apply id_trans_iff in Hid. 
-           destruct Hid as [ev' [Hvis Hproj]]. inversion Hvis. subst.
-           rewrite Hproj. exact H3. }
-         rewrite <- H; rewrite <- H in Heqs; clear H.
-         simpl in Hσ. 
-         exists s. split.
-         * eapply tau_star_trans; [exact Hstar | constructor].
-         * exact Hσ.
-      -- destruct Htrans as [evs [Heqs [Hσ _]]].
-         simpl in Heqs. simpl in Hσ. 
-         destruct evs as [evs | ].
-         ++ assert (evs = ev).
-            { apply projL_ProjR_eq; destruct Heqs as [H1 [H2 H3]]. 
-              exact H2. simpl in H1. rewrite H1. exact H3. }
-            rewrite <- H; rewrite <- H in Heqs; clear H.
-            exists s. split.
-            * eapply tau_star_trans; [exact Hstar | constructor].
-            * exact Hσ.
-         ++ simpl in Heqs. exfalso. destruct Heqs as [_ [HL HR]]. 
-            eapply projL_projR_eps; symmetry; [exact HL | exact HR].
-      -- destruct Htrans as [evt [Heqs [_ Hid]]].
-         simpl in Heqs.
-         remember Hid as Hid'; clear HeqHid'. apply id_trans_iff in Hid'.
-         destruct Hid' as [ev' [Heq Hproj]].
-         rewrite Heq in Heqs. destruct Heqs as [Heq' _]. simpl in Heq'.
-         rewrite <- Heq' in Hproj. symmetry in Heq', Hproj.
-         exfalso. eapply projL_projR_eps; [exact Heq' | exact Hproj].
-    + split; [| reflexivity].
-      constructor.
-  - intros [t []] Htrans. 
-    destruct Htrans as [Htrans | [Htrans | Htrans]].
-    + destruct Htrans as [evs [evt [Heqs [Hσ Hid]]]].
-      apply id_trans_iff in Hid.
-      destruct Heqs as [Heqs [HprojL HprojR]].
-      destruct Hid as [ev' [Heq Hproj]].
-      inversion Heq; subst. simpl in HprojL, HprojR. exfalso.
-      rewrite <- Hproj in HprojR. rewrite <- Heqs in HprojR.
-      eapply projL_projR_eps; [exact HprojL | exact HprojR].
-    + destruct Htrans as [evs [[HprojR [HprojL _]] [Hσ Heq]]].
-      destruct evs as [ev' | ].
-      * simpl in HprojL, HprojR. exfalso.
-        eapply projL_projR_eps; [exact HprojL | exact HprojR].
-      * simpl in Hσ. subst. split; [| reflexivity].
-        eapply tau_star_trans; [exact Hstar | econstructor; [exact Hσ | constructor]].
-    + destruct Htrans as [evt [[HprojL [_ HprojR]] [Heq Hid]]].
-      destruct evt as [ev' | ].
-      * simpl in HprojL, HprojR. exfalso.
-        eapply projL_projR_eps; [symmetry; exact HprojL | exact HprojR].
-      * simpl in Hid. contradiction.
-  Qed.
+    (** Prove it's a simulation in one direction *)
+    Lemma compose_id_rel_sim {A B : sig} (σ : oalts A B) :
+      forall s1 s2, compose_id_rel σ s1 s2 ->
+        alts_simF (compose (id B) σ) σ (compose_id_rel σ) s1 s2.
+    Proof.
+      intros [s []] s2 [Hstar Htt]. simpl in Htt. subst.
+      split.
+      - (* Visible case: compose does s --'ev--> t *)
+        intros ev [t []] Htrans.
+        exists t. split.
+        + (* weak_trans: σ matches via tau_star then visible *)
+          exists s. split; [eapply tau_star_trans; [exact Hstar | constructor] |].
+          destruct Htrans as [[evs [evt [Heqs [Hσ Hid]]]] |
+                            [[evs [Heqs [Hσ _]]] | [evt [Heqs [_ Hid]]]]].
+          * (* Sync case: evs = ev via projections *)
+            apply id_trans_iff in Hid. destruct Hid as [ev' [Heq Hproj]].
+            destruct Heqs as [Hmatch [HprojL HprojR]]. simpl in *.
+            injection Heq as Heq'. rewrite <- Heq' in Hproj.
+            rewrite (projL_ProjR_eq HprojL (eq_trans Hmatch (eq_trans Hproj HprojR))) in Hσ.
+            exact Hσ.
+          * (* Left-only case *)
+            destruct Heqs as [HprojR [HprojL Heps]]. simpl in *.
+            destruct evs as [evs |]; [| exfalso; eapply projL_projR_eps; symmetry; [exact HprojL | exact Heps]].
+            simpl in HprojR. rewrite (projL_ProjR_eq HprojL (eq_trans HprojR Heps)) in Hσ. exact Hσ.
+          * (* Right-only case: contradiction *)
+            apply id_trans_iff in Hid. destruct Hid as [ev' [Heq Hproj]].
+            rewrite Heq in Heqs. destruct Heqs as [HprojL _]. simpl in *.
+            rewrite <- HprojL in Hproj.
+            exfalso. eapply projL_projR_eps; symmetry; [exact HprojL | exact Hproj].
+        + split; [constructor | reflexivity].
+      - (* Tau case: compose does s --ɛ--> t *)
+        intros [t []] Htrans.
+        destruct Htrans as [[evs [evt [Heqs [_ Hid]]]] |
+                          [[evs [Heqs [Hσ Heq]]] | [evt [Heqs [_ Hid]]]]].
+        + (* Sync: contradiction *)
+          apply id_trans_iff in Hid. destruct Hid as [ev' [Heq Hproj]].
+          destruct Heqs as [Hmatch [HprojL HprojR]]. simpl in *.
+          injection Heq as Heq'. rewrite <- Heq' in Hproj. exfalso.
+          eapply projL_projR_eps; [exact HprojL | rewrite Hmatch, Hproj; exact HprojR].
+        + (* Left-only: σ tau step *)
+          destruct Heqs as [HprojR [HprojL _]]. simpl in *.
+          destruct evs as [ev' |]; [exfalso; eapply projL_projR_eps; [exact HprojL | exact HprojR] |].
+          simpl in Hσ. subst. split; [| reflexivity].
+          eapply tau_star_trans; [exact Hstar | econstructor; [exact Hσ | constructor]].
+        + (* Right-only: contradiction *)
+          destruct Heqs as [HprojL [_ HprojR]]. simpl in *.
+          destruct evt as [ev' |]; [exfalso; eapply projL_projR_eps; [symmetry; exact HprojL | exact HprojR] |].
+          simpl in Hid. contradiction.
+    Qed.
 
-  Lemma compose_id_left_forward {A B} (σ : oalts A B) :
-    forall s, alts_sim' (compose (id B) σ) σ (s, tt) s.
-  Proof.
-    intros s.
-    apply (alts_sim_coind (compose (id B) σ) σ (compose_id_rel σ) (compose_id_rel_sim σ)).
-    split; [constructor | reflexivity].
-  Qed.
+    Lemma compose_id_left_forward {A B} (σ : oalts A B) :
+      forall s, alts_sim' (compose (id B) σ) σ (s, tt) s.
+    Proof.
+      intros s.
+      apply (alts_sim_coind (compose (id B) σ) σ (compose_id_rel σ) (compose_id_rel_sim σ)).
+      split; [constructor | reflexivity].
+    Qed.
 
-  (** Relation for backward simulation: σ can be "ahead" via taus *)
-  Definition compose_id_rel_back {A B : sig} (σ : oalts A B)
-    (s1 : states σ) (s2 : states (compose (id B) σ)) : Prop :=
-    tau_star σ (fst s2) s1 /\ snd s2 = tt.
+    (** Relation for backward simulation: σ can be "ahead" via taus *)
+    Definition compose_id_rel_back {A B : sig} (σ : oalts A B)
+      (s1 : states σ) (s2 : states (compose (id B) σ)) : Prop :=
+      tau_star σ (fst s2) s1 /\ snd s2 = tt.
 
-  (** Prove backward simulation via coinduction *)
-  Lemma compose_id_rel_back_sim {A B : sig} (σ : oalts A B) :
-    forall s1 s2, compose_id_rel_back σ s1 s2 ->
-      alts_simF σ (compose (id B) σ) (compose_id_rel_back σ) s1 s2.
-  Proof.
-    intros s1 [s2 []] [Hstar Htt]. simpl in *. subst.
-    split.
-    - (* Visible case: σ does s1 --'ev--> s1' *)
-      intros ev s1' Htrans.
-      (* compose can catch up via taus then do the visible transition *)
-      exists (s1', tt). split.
-      + (* weak_trans: compose does tau_star then visible *)
-        exists (s1, tt). split.
-        * (* tau_star from (s2, tt) to (s1, tt) by propagating σ's taus *)
-          clear Htrans. induction Hstar as [| s0 s1_mid s1_end Hstep Hstar' IHstar].
-          -- constructor.
-          -- eapply tau_step; [| exact IHstar].
-             right. left. exists ɛ. simpl.
-             repeat split; exact Hstep.
-        * (* visible transition (s1, tt) --'ev--> (s1', tt) *)
-          destruct (projR ev) as [b | ] eqn:HprojR.
-          -- (* B component: sync with id *)
-             left. exists ev.
-             destruct b as [bm | bp].
-             ++ exists (neg ⟨bm | bm⟩). simpl. repeat split; auto.
-             ++ exists (pos ⟨bp | bp⟩). simpl. repeat split; auto.
-          -- (* No B component: σ-only *)
-             right. left. exists ('ev). simpl. repeat split; auto.
-      + (* Relation preserved: tau_star σ s1' s1' *)
-        split; [constructor | reflexivity].
-    - (* Tau case: σ does s1 --ɛ--> s1' *)
-      intros s1' Htrans.
-      (* σ advances, compose stays, relation still holds by transitivity *)
-      split; [| reflexivity].
-      eapply tau_star_trans; [exact Hstar | econstructor; [exact Htrans | constructor]].
-  Qed.
+    (** Prove backward simulation via coinduction *)
+    Lemma compose_id_rel_back_sim {A B : sig} (σ : oalts A B) :
+      forall s1 s2, compose_id_rel_back σ s1 s2 ->
+        alts_simF σ (compose (id B) σ) (compose_id_rel_back σ) s1 s2.
+    Proof.
+      intros s1 [s2 []] [Hstar Htt]. simpl in *. subst.
+      split.
+      - (* Visible case: σ does s1 --'ev--> s1' *)
+        intros ev s1' Htrans.
+        (* compose can catch up via taus then do the visible transition *)
+        exists (s1', tt). split.
+        + (* weak_trans: compose does tau_star then visible *)
+          exists (s1, tt). split.
+          * (* tau_star from (s2, tt) to (s1, tt) by propagating σ's taus *)
+            clear Htrans. induction Hstar as [| s0 s1_mid s1_end Hstep Hstar' IHstar].
+            -- constructor.
+            -- eapply tau_step; [| exact IHstar].
+              right. left. exists ɛ. simpl.
+              repeat split; exact Hstep.
+          * (* visible transition (s1, tt) --'ev--> (s1', tt) *)
+            destruct (projR ev) as [b | ] eqn:HprojR.
+            -- (* B component: sync with id *)
+              left. exists ev.
+              destruct b as [bm | bp].
+              ++ exists (neg ⟨bm | bm⟩). simpl. repeat split; auto.
+              ++ exists (pos ⟨bp | bp⟩). simpl. repeat split; auto.
+            -- (* No B component: σ-only *)
+              right. left. exists ('ev). simpl. repeat split; auto.
+        + (* Relation preserved: tau_star σ s1' s1' *)
+          split; [constructor | reflexivity].
+      - (* Tau case: σ does s1 --ɛ--> s1' *)
+        intros s1' Htrans.
+        (* σ advances, compose stays, relation still holds by transitivity *)
+        split; [| reflexivity].
+        eapply tau_star_trans; [exact Hstar | econstructor; [exact Htrans | constructor]].
+    Qed.
 
-  Lemma compose_id_left_backward {A B : sig} (σ : oalts A B) :
-    forall (s : states σ), alts_sim' σ (compose (id B) σ) s (s, tt).
-  Proof.
-    intros s.
-    apply (alts_sim_coind σ (compose (id B) σ) (compose_id_rel_back σ) (compose_id_rel_back_sim σ)).
-    split; [constructor | reflexivity].
-  Qed.
+    Lemma compose_id_left_backward {A B : sig} (σ : oalts A B) :
+      forall (s : states σ), alts_sim' σ (compose (id B) σ) s (s, tt).
+    Proof.
+      intros s.
+      apply (alts_sim_coind σ (compose (id B) σ) (compose_id_rel_back σ) (compose_id_rel_back_sim σ)).
+      split; [constructor | reflexivity].
+    Qed.
 
-  Proposition compose_id_left :
-    forall {A B} (σ : oalts A B), compose (id B) σ ≈ σ.
-  Proof.
-    intros A B σ. split.
-    - intros [s []] [Hstart_σ _].
-      exists s. split; [exact Hstart_σ |].
-      apply compose_id_left_forward.
-    - intros s Hstart_σ.
-      exists (s, tt). split; [split; [exact Hstart_σ | exact I] |].
-      apply compose_id_left_backward.
-  Qed.
+    Proposition compose_id_left :
+      forall {A B} (σ : oalts A B), compose (id B) σ ≈ σ.
+    Proof.
+      intros A B σ. split.
+      - intros [s []] [Hstart_σ _].
+        exists s. split; [exact Hstart_σ |].
+        apply compose_id_left_forward.
+      - intros s Hstart_σ.
+        exists (s, tt). split; [split; [exact Hstart_σ | exact I] |].
+        apply compose_id_left_backward.
+    Qed.
+    
+  End Compose_Id_Left.
 
   (* Module StLess.
     Open Scope event_obj_scope.
