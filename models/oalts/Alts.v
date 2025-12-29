@@ -91,6 +91,18 @@ Module ALTS. (* <: Category. *)
         destruct Htau; auto. contradiction.
     Qed.
 
+    Lemma alts_sim_coind (R : states σ -> states ρ -> Prop) :
+      (forall s1 s2, R s1 s2 -> alts_simF R s1 s2) ->
+      forall s1 s2, R s1 s2 -> alts_sim' s1 s2.
+    Proof.
+      intros HR. pcofix CIH. intros s1 s2 Hrel.
+      pfold. apply HR in Hrel. destruct Hrel as [Hvis Htau]. split.
+      - intros ev s2' Htrans. specialize (Hvis ev s2' Htrans).
+        destruct Hvis as [s1' [Hweak HRnew]].
+        exists s1'. split; [exact Hweak | right; apply CIH; exact HRnew].
+      - intros s2' Htrans. right. apply CIH. apply Htau. exact Htrans.
+    Qed.
+
     Lemma alts_sim'_tau_star : forall s1 s2 s1',
       alts_sim' s1 s1' -> tau_star σ s1 s2 -> alts_sim' s2 s1'.
     Proof.
