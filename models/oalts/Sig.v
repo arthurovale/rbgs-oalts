@@ -296,6 +296,42 @@ Module Sig <: BicartesianCategory.
 
   End Projections.
 
+  Tactic Notation "unfold_projL" := 
+        (unfold projL, AsyncEvents.Plus.fmap, 
+              AsyncEvents.Plus.i1, AsyncEvents.Plus.i2,
+              AsyncEvents.Prod.p1,
+              AsyncEvents.compose; simpl).
+
+      Tactic Notation "unfold_projL" "in" hyp(H) := 
+        (unfold projL, AsyncEvents.Plus.fmap, 
+              AsyncEvents.Plus.i1, AsyncEvents.Plus.i2,
+              AsyncEvents.Prod.p1,
+              AsyncEvents.compose in H; simpl in H).
+
+      Tactic Notation "unfold_projR" := 
+        (unfold projR, AsyncEvents.Plus.fmap, 
+              AsyncEvents.Plus.i1, AsyncEvents.Plus.i2,
+              AsyncEvents.Prod.p2,
+              AsyncEvents.compose; simpl).
+
+      Tactic Notation "unfold_projR" "in" hyp(H) := 
+        (unfold projR, AsyncEvents.Plus.fmap, 
+              AsyncEvents.Plus.i1, AsyncEvents.Plus.i2,
+              AsyncEvents.Prod.p2,
+              AsyncEvents.compose in H; simpl in H).
+
+      Tactic Notation "unfold_proj" := 
+        (unfold projL, projR, AsyncEvents.Plus.fmap, 
+              AsyncEvents.Plus.i1, AsyncEvents.Plus.i2,
+              AsyncEvents.Prod.p1, AsyncEvents.Prod.p2,
+              AsyncEvents.compose; simpl).
+
+      Tactic Notation "unfold_proj" "in" hyp(H) := 
+        (unfold projL, projR, AsyncEvents.Plus.fmap, 
+              AsyncEvents.Plus.i1, AsyncEvents.Plus.i2,
+              AsyncEvents.Prod.p1, AsyncEvents.Prod.p2,
+              AsyncEvents.compose in H; simpl in H).
+              
   (* Section ComposeHelpers.
     Import AsyncEvents.
 

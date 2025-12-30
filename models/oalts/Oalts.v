@@ -5,7 +5,7 @@ Require Import oalts.Sig.
 Require Import Coq.Logic.FunctionalExtensionality.
 From Paco Require Import paco.
 
-Module OALTS. (* <: Category. *)
+Module OALTSBase. (* <: Category. *)
   Import AsyncEvents.
   Import Sig.
   Import ALTS.
@@ -41,25 +41,34 @@ Module OALTS. (* <: Category. *)
         end
     |}.
 
-  Lemma id_trans_iff {A : sig} {ev : Async [A -o A]} {s s' : states (id A)} :
-    id A s ev s' <-> 
-      exists ev', ev = 'ev' /\ projL ev' = projR ev'.
-  Proof.
-    split.
-    - intros.
-      destruct ev as [ev'| ]; [| contradiction].
-      exists ev'. simpl in H. destruct ev' as [ev' | ev'].
-      all: split; [reflexivity | ].
-      all: destruct ev'; subst; try reflexivity; try contradiction.
-    - intros; simpl. destruct H as [ev' [Hvis Heq]].
-      rewrite Hvis. destruct ev' as [ev' | ev']; destruct ev';
-      simpl in Heq;
-      try unfold AsyncEvents.Plus.i1, AsyncEvents.Plus.i2, 
-        AsyncEvents.Prod.p1, AsyncEvents.Prod.p2, AsyncEvents.compose in Heq;
-      inversion Heq; reflexivity.
-  Qed.
+  Section Id_Aux.
 
+    Lemma id_trans_iff {A : sig} {ev : Async [A -o A]} {s s' : states (id A)} :
+      id A s ev s' <-> 
+        exists ev', ev = 'ev' /\ projL ev' = projR ev'.
+    Proof.
+      split.
+      - intros.
+        destruct ev as [ev'| ]; [| contradiction].
+        exists ev'. simpl in H. destruct ev' as [ev' | ev'].
+        all: split; [reflexivity | ].
+        all: destruct ev'; subst; try reflexivity; try contradiction.
+      - intros; simpl. destruct H as [ev' [Hvis Heq]].
+        rewrite Hvis. destruct ev' as [ev' | ev']; destruct ev';
+        simpl in Heq; try unfold_proj in Heq;
+        inversion Heq; reflexivity.
+    Qed.
 
+    Lemma id_weak_trans {A : sig} : forall s ev s',
+      weak_trans (id A) s ev s' <-> trans (id A) s ('ev) s'.
+    Proof.
+      intros [] ev []. split. 
+      - intros H. destruct H as [[] [Hstar Hid]]. exact Hid.
+      - intros Hid. exists tt. split. 
+        apply tau_refl. exact Hid.
+    Qed.
+
+  End Id_Aux.
 
   Section Compose_Id_Left.
 
@@ -327,7 +336,7 @@ Module OALTS. (* <: Category. *)
 
   End Compose_Assoc.
 
-  Module StLess.
+  Module StateLess. (* Functor *)
     Open Scope event_obj_scope.
 
     Definition StLess {A B : sig} (gen : Sig.m A B) : oalts A B :=
@@ -377,14 +386,152 @@ Module OALTS. (* <: Category. *)
     Lemma StLess_compose_sim_forward {A B C : sig} (gen : Sig.m A B) (gen' : Sig.m B C) :
       forall (s : unit * unit),
         alts_sim' (compose (StLess gen') (StLess gen)) (StLess (gen' @ gen)) s tt.
-    Admitted.
+    Proof.
+      pcofix IH. intros [[] []].
+      pfold. split.
+      - (* Visible transitions *)
+        intros ev [[] []] Htrans. simpl in Htrans.
+        exists tt. split.
+        + (* weak_trans on RHS *)
+          apply StLess_weak_trans. simpl.
+          (* Analyze the three cases from compose *)
+          destruct Htrans as [[evs [evt [[Hmatch [HprojL HprojR]] [Hσ Hτ]]]] |
+                             [[evs [[HprojRε [HprojL HprojRev]] [Hσ _]]] |
+                              [evt [[HprojLε [HprojLev HprojR]] [_ Hτ]]]]]; simpl in *.
+          * (* Sync case: both gen and gen' make visible transitions *)
+            destruct evs as [evsm | evsp]; destruct evt as [evtm | evtp];
+            simpl in Hmatch.
+            -- (* Both negative: evsm and evtm *)
+               destruct evsm as [am bm | am | bm]; destruct evtm as [bm' cm | bm' | cm];
+               simpl in Hσ, Hτ, Hmatch; try contradiction; try discriminate;
+               destruct ev as [evm | evp]; simpl in HprojL, HprojR;
+               try destruct evm as [am' cm' | am' | cm'];
+               try destruct evp as [ap' cp' | ap' | cp'];
+               simpl in HprojL, HprojR; try discriminate;
+               inversion Hmatch; subst; inversion HprojL; subst; inversion HprojR; subst;
+               simpl; unfold Sig.compose; simpl; unfold AsyncEventsBase.compose;
+               try (rewrite Hσ; exact Hτ); try (rewrite Hσ; simpl; exact Hτ).
+            -- (* evsm negative, evtp positive: impossible by type *)
+               destruct evsm as [am bm | am | bm]; destruct evtp as [bp' cp | bp' | cp];
+               simpl in Hσ, Hτ, Hmatch; try contradiction; try discriminate.
+            -- (* evsp positive, evtm negative: impossible by type *)
+               destruct evsp as [ap bp | ap | bp]; destruct evtm as [bm' cm | bm' | cm];
+               simpl in Hσ, Hτ, Hmatch; try contradiction; try discriminate.
+            -- (* Both positive: evsp and evtp *)
+               destruct evsp as [ap bp | ap | bp]; destruct evtp as [bp' cp | bp' | cp];
+               simpl in Hσ, Hτ, Hmatch; try contradiction; try discriminate;
+               destruct ev as [evm | evp]; simpl in HprojL, HprojR;
+               try destruct evm as [am' cm' | am' | cm'];
+               try destruct evp as [ap' cp' | ap' | cp'];
+               simpl in HprojL, HprojR; try discriminate;
+               inversion Hmatch; subst; inversion HprojL; subst; inversion HprojR; subst;
+               simpl; unfold Sig.compose; simpl; unfold AsyncEventsBase.compose;
+               try (rewrite Hσ; exact Hτ); try (rewrite Hσ; simpl; exact Hτ).
+          * (* Left-only case: only gen makes a transition *)
+            destruct evs as [evs' | ]; simpl in HprojRε, Hσ; try contradiction.
+            destruct evs' as [evsm | evsp].
+            -- destruct evsm as [am bm | am | bm];
+               simpl in HprojRε, Hσ; try discriminate; try contradiction;
+               destruct ev as [evm | evp];
+               try destruct evm as [am' cm' | am' | cm'];
+               try destruct evp as [ap' cp' | ap' | cp'];
+               simpl in HprojL, HprojRev; try discriminate;
+               inversion HprojL; subst;
+               simpl; unfold Sig.compose; simpl; unfold AsyncEventsBase.compose;
+               rewrite Hσ; reflexivity.
+            -- destruct evsp as [ap bp | ap | bp];
+               simpl in HprojRε, Hσ; try discriminate; try contradiction;
+               destruct ev as [evm | evp];
+               try destruct evm as [am' cm' | am' | cm'];
+               try destruct evp as [ap' cp' | ap' | cp'];
+               simpl in HprojL, HprojRev; try discriminate;
+               inversion HprojL; subst;
+               simpl; unfold Sig.compose; simpl; unfold AsyncEventsBase.compose;
+               rewrite Hσ; reflexivity.
+          * (* Right-only case: only gen' makes a transition - impossible *)
+            destruct evt as [evt' | ]; simpl in Hτ, HprojLε; try contradiction.
+            destruct evt' as [evtm | evtp].
+            -- destruct evtm as [bm cm | bm | cm];
+               simpl in Hτ, HprojLε; try discriminate; try contradiction.
+            -- destruct evtp as [bp cp | bp | cp];
+               simpl in Hτ, HprojLε; try discriminate; try contradiction.
+        + right. apply IH.
+      - (* Tau transitions - compose of StLess has no real tau transitions *)
+        intros [[] []] Htrans. simpl in Htrans.
+        destruct Htrans as [[evs [evt [[_ [HprojL _]] [Hσ _]]]] |
+                           [[evs [[_ [HprojL _]] [Hσ _]]] |
+                            [evt [[HprojL _] [_ Hτ]]]]]; simpl in *.
+        + (* Sync case: projL evs = ɛ, but StLess only has transitions on
+             events where projL is visible *)
+          destruct evs as [evsm | evsp]; simpl in HprojL;
+          [destruct evsm as [am bm | am | bm] | destruct evsp as [ap bp | ap | bp]];
+          simpl in HprojL, Hσ; try discriminate; contradiction.
+        + (* Left-only case: similar - evs must be asyncr but StLess has no such transitions *)
+          destruct evs as [evs' | ]; simpl in Hσ; try contradiction.
+          destruct evs' as [evsm | evsp]; simpl in HprojL;
+          [destruct evsm as [am bm | am | bm] | destruct evsp as [ap bp | ap | bp]];
+          simpl in HprojL, Hσ; try discriminate; contradiction.
+        + (* Right-only case: similar for evt *)
+          destruct evt as [evt' | ]; simpl in Hτ; try contradiction.
+          destruct evt' as [evtm | evtp]; simpl in HprojL;
+          [destruct evtm as [bm cm | bm | cm] | destruct evtp as [bp cp | bp | cp]];
+          simpl in HprojL, Hτ; try discriminate; contradiction.
+    Qed.
 
     (** Backward simulation helper *)
     Lemma StLess_compose_sim_backward {A B C : sig} (gen : Sig.m A B) (gen' : Sig.m B C) :
       forall (s : unit),
         alts_sim' (StLess (gen' @ gen)) (compose (StLess gen') (StLess gen) ) s (tt, tt).
     Proof.
-    Admitted.
+      pcofix IH. intros [].
+      pfold. split.
+      - (* Visible transitions *)
+        intros ev [] Htrans. simpl in Htrans.
+        exists (tt, tt). split.
+        + (* weak_trans on composed system *)
+          apply compose_StLess_weak_trans. simpl.
+          destruct ev as [evm | evp].
+          * (* Negative polarity *)
+            destruct evm as [am cm | am | cm]; simpl in Htrans; try contradiction.
+            -- (* ev = neg ⟨am | cm⟩ : (gen' @ gen)^- am = 'cm *)
+               unfold Sig.compose in Htrans. simpl in Htrans.
+               unfold AsyncEventsBase.compose in Htrans.
+               destruct (gen^- am) as [bm |] eqn:Hgen; simpl in Htrans.
+               ++ (* gen^- am = 'bm, gen'^- bm = 'cm *)
+                  left. exists (neg ⟨am | bm⟩), (neg ⟨bm | cm⟩).
+                  simpl. repeat split; auto.
+               ++ discriminate Htrans.
+            -- (* ev = neg ⟨am |⟩ : (gen' @ gen)^- am = ɛ *)
+               unfold Sig.compose in Htrans. simpl in Htrans.
+               unfold AsyncEventsBase.compose in Htrans.
+               destruct (gen^- am) as [bm |] eqn:Hgen; simpl in Htrans.
+               ++ (* gen^- am = 'bm, gen'^- bm = ɛ *)
+                  left. exists (neg ⟨am | bm⟩), (neg ⟨bm |⟩).
+                  simpl. repeat split; auto.
+               ++ (* gen^- am = ɛ *)
+                  right. left. exists ('neg ⟨am |⟩).
+                  simpl. repeat split; auto.
+          * (* Positive polarity *)
+            destruct evp as [ap cp | ap | cp]; simpl in Htrans; try contradiction.
+            -- (* ev = pos ⟨ap | cp⟩ : (gen' @ gen)^+ ap = 'cp *)
+               unfold Sig.compose in Htrans. simpl in Htrans.
+               unfold AsyncEventsBase.compose in Htrans.
+               destruct (gen^+ ap) as [bp |] eqn:Hgen; simpl in Htrans.
+               ++ left. exists (pos ⟨ap | bp⟩), (pos ⟨bp | cp⟩).
+                  simpl. repeat split; auto.
+               ++ discriminate Htrans.
+            -- (* ev = pos ⟨ap |⟩ : (gen' @ gen)^+ ap = ɛ *)
+               unfold Sig.compose in Htrans. simpl in Htrans.
+               unfold AsyncEventsBase.compose in Htrans.
+               destruct (gen^+ ap) as [bp |] eqn:Hgen; simpl in Htrans.
+               ++ left. exists (pos ⟨ap | bp⟩), (pos ⟨bp |⟩).
+                  simpl. repeat split; auto.
+               ++ right. left. exists ('pos ⟨ap |⟩).
+                  simpl. repeat split; auto.
+        + right. apply IH.
+      - (* Tau transitions - StLess has none *)
+        intros [] Htrans. simpl in Htrans. contradiction.
+    Qed.
     
     Proposition StLess_compose {A B C : sig} {gen : Sig.m A B} {gen' : Sig.m B C} :
       compose (StLess gen') (StLess gen) ≈ StLess (gen' @ gen).
@@ -399,7 +546,38 @@ Module OALTS. (* <: Category. *)
         exists (tt, tt). split; [split; exact I |].
         apply StLess_compose_sim_backward.
     Qed.
-    
-  End StLess.
 
-End OALTS.
+    Proposition id_StLess {A : sig} : id A ≈ StLess (Sig.id A).
+    Proof.
+      split. 
+      - intros [] _. exists tt. split. exact I. 
+        pcofix IH. pfold. split.
+        + intros ev [] Hid.
+          exists tt. split.
+          * apply StLess_weak_trans. simpl.
+            apply id_trans_iff in Hid.
+            destruct Hid as [a [Heq Hproj]]. 
+            injection Heq; clear Heq; intros Heq.
+            rewrite <- Heq in Hproj; clear Heq.
+            destruct ev as [[ev | ev | ev] | [ev | ev | ev]]; 
+            try unfold AsyncEvents.id; simpl.
+            all: unfold_proj in Hproj;
+              inversion Hproj; subst; reflexivity.
+          * right. apply IH.
+        + intros [] Hid. simpl in Hid. contradiction.
+      - intros [] _. exists tt. split. exact I.
+        pcofix IH. pfold. split.
+        + intros ev [] Hid. exists tt. split.
+          * apply id_weak_trans. apply id_trans_iff.
+            exists ev. split. reflexivity.
+            simpl in Hid.
+            destruct ev as [[ev | ev | ev] | [ev | ev | ev]];
+            unfold AsyncEvents.id in Hid; simpl in Hid; unfold_proj;
+            inversion Hid; reflexivity.
+          * right. apply IH.
+        + intros [] Hid. contradiction.
+    Qed.
+
+  End StateLess.
+
+End OALTSBase.
