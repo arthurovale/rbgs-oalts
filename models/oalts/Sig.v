@@ -302,84 +302,34 @@ Module Sig <: BicartesianCategory.
               AsyncEvents.Prod.p1,
               AsyncEvents.compose; simpl).
 
-      Tactic Notation "unfold_projL" "in" hyp(H) := 
-        (unfold projL, AsyncEvents.Plus.fmap, 
-              AsyncEvents.Plus.i1, AsyncEvents.Plus.i2,
-              AsyncEvents.Prod.p1,
-              AsyncEvents.compose in H; simpl in H).
+  Tactic Notation "unfold_projL" "in" hyp(H) := 
+    (unfold projL, AsyncEvents.Plus.fmap, 
+          AsyncEvents.Plus.i1, AsyncEvents.Plus.i2,
+          AsyncEvents.Prod.p1,
+          AsyncEvents.compose in H; simpl in H).
 
-      Tactic Notation "unfold_projR" := 
-        (unfold projR, AsyncEvents.Plus.fmap, 
-              AsyncEvents.Plus.i1, AsyncEvents.Plus.i2,
-              AsyncEvents.Prod.p2,
-              AsyncEvents.compose; simpl).
+  Tactic Notation "unfold_projR" := 
+    (unfold projR, AsyncEvents.Plus.fmap, 
+          AsyncEvents.Plus.i1, AsyncEvents.Plus.i2,
+          AsyncEvents.Prod.p2,
+          AsyncEvents.compose; simpl).
 
-      Tactic Notation "unfold_projR" "in" hyp(H) := 
-        (unfold projR, AsyncEvents.Plus.fmap, 
-              AsyncEvents.Plus.i1, AsyncEvents.Plus.i2,
-              AsyncEvents.Prod.p2,
-              AsyncEvents.compose in H; simpl in H).
+  Tactic Notation "unfold_projR" "in" hyp(H) := 
+    (unfold projR, AsyncEvents.Plus.fmap, 
+          AsyncEvents.Plus.i1, AsyncEvents.Plus.i2,
+          AsyncEvents.Prod.p2,
+          AsyncEvents.compose in H; simpl in H).
 
-      Tactic Notation "unfold_proj" := 
-        (unfold projL, projR, AsyncEvents.Plus.fmap, 
-              AsyncEvents.Plus.i1, AsyncEvents.Plus.i2,
-              AsyncEvents.Prod.p1, AsyncEvents.Prod.p2,
-              AsyncEvents.compose; simpl).
+  Tactic Notation "unfold_proj" := 
+    (unfold projL, projR, AsyncEvents.Plus.fmap, 
+          AsyncEvents.Plus.i1, AsyncEvents.Plus.i2,
+          AsyncEvents.Prod.p1, AsyncEvents.Prod.p2,
+          AsyncEvents.compose; simpl).
 
-      Tactic Notation "unfold_proj" "in" hyp(H) := 
-        (unfold projL, projR, AsyncEvents.Plus.fmap, 
-              AsyncEvents.Plus.i1, AsyncEvents.Plus.i2,
-              AsyncEvents.Prod.p1, AsyncEvents.Prod.p2,
-              AsyncEvents.compose in H; simpl in H).
+  Tactic Notation "unfold_proj" "in" hyp(H) := 
+    (unfold projL, projR, AsyncEvents.Plus.fmap, 
+          AsyncEvents.Plus.i1, AsyncEvents.Plus.i2,
+          AsyncEvents.Prod.p1, AsyncEvents.Prod.p2,
+          AsyncEvents.compose in H; simpl in H).
               
-  (* Section ComposeHelpers.
-    Import AsyncEvents.
-
-    Local Open Scope event_obj_scope.
-    
-    (** ** Helpers for strategy composition *)
-
-    (** Embed an asynchronous A event from [A -o B] into [A -o C].
-        Only matches the A-only cases; others are unreachable if projR = ɛ *)
-    Definition embed_L {A B C : sig} (ev : [A -o B]) (H : projR ev = ɛ) : [A -o C].
-    Proof.
-      destruct ev as [evm | evp].
-      - (* inl: from A^- && B^- *)
-        destruct evm as [[am bm] | am | bm]; simpl in H.
-        + discriminate H.        (* sync has B component *)
-        + exact (inl ⟨am |⟩).    (* A^- only *)
-        + discriminate H.        (* B^- only *)
-      - (* inr: from A^+ && B^+ *)
-        destruct evp as [[ap bp] | ap | bp]; simpl in H.
-        + discriminate H.        (* sync has B component *)
-        + exact (inr ⟨ap |⟩).    (* A^+ only *)
-        + discriminate H.        (* B^+ only *)
-    Defined.
-
-    (** Embed an asynchronous C event from «B -o C» into «A -o C».
-        Only matches the C-only cases; others are unreachable if projL = ɛ *)
-    Definition embed_R {A B C : sig} (ev : «B -o C») (H : projL ev = ɛ) : «A -o C».
-    Proof.
-      destruct ev as [[bm | cm] [bp | cp] | [bm | cm] | [bp | cp]];
-      simpl in H.
-      - discriminate H.
-      - exact ⟨| tgt cp⟩.
-      - exact ⟨tgt cm |⟩.
-      - exact ⟨tgt cm | tgt cp⟩.
-      - discriminate H.
-      - exact ⟨tgt cm |⟩.
-      - discriminate H.
-      - exact ⟨| tgt cp⟩.
-    Defined.
-
-    (** Does a sync have at least one visible A or C component?
-        Returns true if not a pure sync
-        (pure sync = both evσ and evτ are asynchronous B events) *)
-    Definition has_visible_AC {A B C : sig} (evσ : «A -o B») (evτ : «B -o C») : bool :=
-      match projL evσ, projR evτ with
-      | ɛ, ɛ => false  (* pure sync: no A component, no C component *)
-      | _, _ => true   (* has A component, C component, or both *)
-      end.
-  End ComposeHelpers. *)
-
 End Sig.
