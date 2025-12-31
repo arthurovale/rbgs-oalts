@@ -18,13 +18,13 @@ Module ALTS. (* <: Category. *)
     Context {A : Type}.
     Variable σ : alts A.
 
-    Inductive tau_star : states σ -> states σ -> Prop :=
-    | tau_refl : forall s, tau_star s s
-    | tau_step : forall s1 s2 s3, 
-        σ s1 ɛ s2 -> tau_star s2 s3 -> tau_star s1 s3.
+    Inductive eps_star : states σ -> states σ -> Prop :=
+    | eps_refl : forall s, eps_star s s
+    | eps_step : forall s1 s2 s3,
+        σ s1 ɛ s2 -> eps_star s2 s3 -> eps_star s1 s3.
 
-    Lemma tau_star_trans : forall (s1 s2 s3 : states σ),
-      tau_star s1 s2 -> tau_star s2 s3 -> tau_star s1 s3.
+    Lemma eps_star_trans : forall (s1 s2 s3 : states σ),
+      eps_star s1 s2 -> eps_star s2 s3 -> eps_star s1 s3.
     Proof.
       intros s1 s2 s3 H1 H2.
       induction H1; auto.
@@ -33,11 +33,11 @@ Module ALTS. (* <: Category. *)
 
     (* ɛ* followed by visible step *)
     Definition weak_trans (s : states σ) (ev : A) (s' : states σ) : Prop :=
-      exists s'', tau_star s s'' /\ σ s'' (vis ev) s'.
+      exists s'', eps_star s s'' /\ σ s'' (vis ev) s'.
 
     CoFixpoint beh (s : states σ) : tree A :=
       go (
-        StepF 
+        StepF
           { ev : A  &  { s' : states σ | weak_trans s ev s' }}
           (fun x => projT1 x)
           (fun x => beh (proj1_sig (projT2 x)))
@@ -59,11 +59,11 @@ Module ALTS. (* <: Category. *)
 
     Lemma alts_simF_mon : monotone2 alts_simF.
     Proof.
-      unfold monotone2, alts_simF. intros s1 s1' R R' [Hvis Htau] LE.
+      unfold monotone2, alts_simF. intros s1 s1' R R' [Hvis Heps] LE.
       split.
       - intros ev s2 Htrans. specialize (Hvis ev s2 Htrans).
         destruct Hvis as [s2' [Hweak HR]]. exists s2'. split; auto.
-      - intros s2 Htrans. apply LE. apply Htau. exact Htrans.
+      - intros s2 Htrans. apply LE. apply Heps. exact Htrans.
     Qed.
 
     #[local] Hint Resolve alts_simF_mon : paco.
@@ -74,21 +74,21 @@ Module ALTS. (* <: Category. *)
     Proposition alts_simF_sim' : forall s1 s1',
       alts_simF alts_sim' s1 s1' -> alts_sim' s1 s1'.
     Proof.
-      intros s1 s1' [Hvis Htau]. pfold. split.
+      intros s1 s1' [Hvis Heps]. pfold. split.
       - intros ev s2 Htrans. specialize (Hvis ev s2 Htrans).
         destruct Hvis as [s2' [Hweak HR]]. exists s2'. split; auto.
-      - intros s2 Htrans. left. apply Htau. exact Htrans.
+      - intros s2 Htrans. left. apply Heps. exact Htrans.
     Qed.
 
     Proposition alts_sim'_simF : forall s1 s1',
       alts_sim' s1 s1' -> alts_simF alts_sim' s1 s1'.
     Proof.
-      intros s1 s1' H. punfold H. destruct H as [Hvis Htau]. split.
+      intros s1 s1' H. punfold H. destruct H as [Hvis Heps]. split.
       - intros ev s2 Htrans. specialize (Hvis ev s2 Htrans).
         destruct Hvis as [s2' [Hweak HR]]. exists s2'. split; auto.
         destruct HR; auto. contradiction.
-      - intros s2 Htrans. specialize (Htau s2 Htrans).
-        destruct Htau; auto. contradiction.
+      - intros s2 Htrans. specialize (Heps s2 Htrans).
+        destruct Heps; auto. contradiction.
     Qed.
 
     Lemma alts_sim_coind (R : states σ -> states ρ -> Prop) :
@@ -96,41 +96,41 @@ Module ALTS. (* <: Category. *)
       forall s1 s2, R s1 s2 -> alts_sim' s1 s2.
     Proof.
       intros HR. pcofix CIH. intros s1 s2 Hrel.
-      pfold. apply HR in Hrel. destruct Hrel as [Hvis Htau]. split.
+      pfold. apply HR in Hrel. destruct Hrel as [Hvis Heps]. split.
       - intros ev s2' Htrans. specialize (Hvis ev s2' Htrans).
         destruct Hvis as [s1' [Hweak HRnew]].
         exists s1'. split; [exact Hweak | right; apply CIH; exact HRnew].
-      - intros s2' Htrans. right. apply CIH. apply Htau. exact Htrans.
+      - intros s2' Htrans. right. apply CIH. apply Heps. exact Htrans.
     Qed.
 
-    Lemma alts_sim'_tau_star : forall s1 s2 s1',
-      alts_sim' s1 s1' -> tau_star σ s1 s2 -> alts_sim' s2 s1'.
+    Lemma alts_sim'_eps_star : forall s1 s2 s1',
+      alts_sim' s1 s1' -> eps_star σ s1 s2 -> alts_sim' s2 s1'.
     Proof.
       intros s1 s2 s1' Hsim Hstar.
       induction Hstar.
       - exact Hsim.
-      - apply alts_sim'_simF in Hsim as [Hvis Htau].
+      - apply alts_sim'_simF in Hsim as [Hvis Heps].
         apply IHHstar.
-        apply Htau. exact H.
+        apply Heps. exact H.
     Qed.
 
-  Theorem alts_sim'_beh : forall s1 s1',
-    alts_sim' s1 s1' -> ssim (beh σ s1) (beh ρ s1').
-  Proof.
-    pcofix CIH.
-    intros s1 s1' Hsim.
-    pfold. simpl.
-    intros [ev [s2 Hweak]]. simpl.
-    destruct Hweak as [s3 [Hstar Htrans]].
-    pose proof (alts_sim'_tau_star s1 s3 s1' Hsim Hstar) as Hsim'.
-    apply alts_sim'_simF in Hsim' as [Hvis Htau].
-    specialize (Hvis ev s2 Htrans).
-    destruct Hvis as [s2' [Hweak2 Hsim'']].
-    exists (existT _ ev (exist _ s2' Hweak2)).
-    simpl. split.
-    - reflexivity.
-    - right. apply CIH. exact Hsim''.
-  Qed.
+    Theorem alts_sim'_beh : forall s1 s1',
+      alts_sim' s1 s1' -> ssim (beh σ s1) (beh ρ s1').
+    Proof.
+      pcofix CIH.
+      intros s1 s1' Hsim.
+      pfold. simpl.
+      intros [ev [s2 Hweak]]. simpl.
+      destruct Hweak as [s3 [Hstar Htrans]].
+      pose proof (alts_sim'_eps_star s1 s3 s1' Hsim Hstar) as Hsim'.
+      apply alts_sim'_simF in Hsim' as [Hvis Heps].
+      specialize (Hvis ev s2 Htrans).
+      destruct Hvis as [s2' [Hweak2 Hsim'']].
+      exists (existT _ ev (exist _ s2' Hweak2)).
+      simpl. split.
+      - reflexivity.
+      - right. apply CIH. exact Hsim''.
+    Qed.
 
   End Sim.
 
@@ -142,7 +142,7 @@ Module ALTS. (* <: Category. *)
   (** ** State-level simulation properties *)
 
   Lemma alts_sim'_refl_gen {A : Type} (σ : alts A) (s s' : states σ) :
-    tau_star σ s' s -> alts_sim' σ σ s s'.
+    eps_star σ s' s -> alts_sim' σ σ s s'.
   Proof.
     revert s s'. pcofix IH. intros s s' Hstar. pfold. split.
     - intros ev s2 Htrans.
@@ -151,7 +151,7 @@ Module ALTS. (* <: Category. *)
       + right. apply IH. constructor.
     - intros s2 Htrans.
       right. apply IH.
-      eapply tau_star_trans; 
+      eapply eps_star_trans; 
       [exact Hstar | econstructor; [exact Htrans | constructor]].
   Qed.
 
@@ -166,22 +166,22 @@ Module ALTS. (* <: Category. *)
     alts_sim' σ ρ s1 s2 -> alts_sim' ρ τ s2 s3 -> alts_sim' σ τ s1 s3.
   Proof.
     revert s1 s2 s3. pcofix IH. intros s1 s2 s3 H12 H23.
-    apply alts_sim'_simF in H12 as [Hvis12 Htau12].
+    apply alts_sim'_simF in H12 as [Hvis12 Heps12].
     pfold. split.
     - intros ev s1' Htrans.
       specialize (Hvis12 ev s1' Htrans).
       destruct Hvis12 as [s2' [[s2'' [Hstar12 Htrans12]] Hsim12]].
-      pose proof (alts_sim'_tau_star ρ τ s2 s2'' s3 H23 Hstar12) as H23'.
-      apply alts_sim'_simF in H23' as [Hvis23' Htau23'].
+      pose proof (alts_sim'_eps_star ρ τ s2 s2'' s3 H23 Hstar12) as H23'.
+      apply alts_sim'_simF in H23' as [Hvis23' Heps23'].
       specialize (Hvis23' ev s2' Htrans12).
       destruct Hvis23' as [s3' [Hweak23 Hsim23]].
       exists s3'. split.
       + exact Hweak23.
       + right. eapply IH; eassumption.
     - intros s1' Htrans.
-      specialize (Htau12 s1' Htrans).
+      specialize (Heps12 s1' Htrans).
       right. eapply IH.
-      + exact Htau12.
+      + exact Heps12.
       + exact H23.
   Qed.
 
