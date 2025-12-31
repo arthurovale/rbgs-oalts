@@ -49,3 +49,4 @@ models/oalts/Tree.v
 models/oalts/Alts.v
 models/oalts/Strat.v
 models/oalts/Oalts.v
+models/oalts/BisimSetoid.v
