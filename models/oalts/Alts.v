@@ -272,4 +272,15 @@ Module ALTS. (* <: Category. *)
     - eapply alts_sim_trans; eassumption.
   Qed.
 
+  Add Parametric Relation {A : Type} : (alts A) alts_sim
+  reflexivity proved by alts_sim_refl
+  transitivity proved by alts_sim_trans
+  as alts_sim_preorder.  
+
+  Add Parametric Relation {A : Type} : (alts A) alts_bisim
+    reflexivity proved by alts_bisim_refl
+    symmetry proved by alts_bisim_sym
+    transitivity proved by alts_bisim_trans
+    as alts_bisim_equiv.
+
 End ALTS.

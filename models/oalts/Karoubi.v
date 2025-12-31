@@ -102,6 +102,21 @@ Module KaroubiBase. (* <: Category *)
       forall (σ τ ρ : idem_mor e e'), σ ≈ τ -> τ ≈ ρ -> σ ≈ ρ.
     Proof. intros. eapply alts_bisim_trans; eassumption. Qed.
 
+    Add Parametric Relation {A B : sig} {e : idem A} {e' : idem B}
+      : (idem_mor e e') idem_mor_sim
+      reflexivity proved by idem_mor_sim_refl
+      transitivity proved by idem_mor_sim_trans
+      as idem_mor_sim_preorder.
+
+    Add Parametric Morphism {A B C : sig} {eA : idem A} {eB : idem B} {eC : idem C}
+      : (@compose A B C eA eB eC)
+      with signature idem_mor_sim ==> idem_mor_sim ==> idem_mor_sim
+      as karoubi_compose_sim_morphism.
+    Proof.
+      intros τ τ' Hτ σ σ' Hσ. simpl.
+      apply OALTS.compose_mon; assumption.
+    Qed.
+
     (** Register bisimulation as equivalence relation for setoid rewriting *)
     Add Parametric Relation {A B : sig} {e : idem A} {e' : idem B}
       : (idem_mor e e') idem_mor_bisim
@@ -119,7 +134,7 @@ Module KaroubiBase. (* <: Category *)
       intros τ τ' Hτ σ σ' Hσ. simpl.
       apply OALTS.compose_cong; assumption.
     Qed.
-
+    
   End Simulation.
 
   Arguments idem_mor_bisim {A B e e'} _ _ /.
