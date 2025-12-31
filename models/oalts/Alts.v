@@ -14,6 +14,10 @@ Module ALTS. (* <: Category. *)
   }.
   Arguments alts : clear implicits.
 
+  Bind Scope alts_scope with alts.
+  Delimit Scope alts_scope with alts.
+  Open Scope alts_scope.
+
   Section Beh.
     Context {A : Type}.
     Variable σ : alts A.
@@ -137,7 +141,7 @@ Module ALTS. (* <: Category. *)
   #[export] Hint Resolve alts_simF_mon : paco.
 
   (** Notation for state-level simulation *)
-  Notation "s1 ≲'[ σ , ρ ] s1'" := (alts_sim' σ ρ s1 s1') (at level 70).
+  Notation "s1 ≲'[ σ , ρ ] s1'" := (alts_sim' σ ρ s1 s1') (at level 70) : alts_scope.
 
   (** ** State-level simulation properties *)
 
@@ -190,7 +194,7 @@ Module ALTS. (* <: Category. *)
     (s1 : states σ) (s1' : states ρ) : Prop :=
     alts_sim' σ ρ s1 s1' /\ alts_sim' ρ σ s1' s1.
 
-  Notation "s1 ≈'[ σ , ρ ] s1'" := (alts_bisim' σ ρ s1 s1') (at level 70).
+  Notation "s1 ≈'[ σ , ρ ] s1'" := (alts_bisim' σ ρ s1 s1') (at level 70) : alts_scope.
 
   Proposition alts_bisim'_refl {A : Type} (σ : alts A) (s : states σ) :
     alts_bisim' σ σ s s.
@@ -220,7 +224,7 @@ Module ALTS. (* <: Category. *)
   Definition alts_sim {A : Type} (σ ρ : alts A) : Prop :=
     forall s1, start σ s1 -> exists s1', start ρ s1' /\ alts_sim' σ ρ s1 s1'.
 
-  Notation "σ ≲ ρ" := (alts_sim σ ρ) (at level 70).
+  Notation "σ ≲ ρ" := (alts_sim σ ρ) (at level 70) : alts_scope.
 
   Proposition alts_sim_refl {A : Type} (σ : alts A) : σ ≲ σ.
   Proof.
@@ -247,7 +251,7 @@ Module ALTS. (* <: Category. *)
   Definition alts_bisim {A : Type} (σ ρ : alts A) : Prop :=
     alts_sim σ ρ /\ alts_sim ρ σ.
 
-  Notation "σ ≈ ρ" := (alts_bisim σ ρ) (at level 70).
+  Notation "σ ≈ ρ" := (alts_bisim σ ρ) (at level 70) : alts_scope.
 
   Proposition alts_bisim_refl {A : Type} (σ : alts A) : σ ≈ σ.
   Proof.
