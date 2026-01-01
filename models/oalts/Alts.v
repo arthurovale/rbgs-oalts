@@ -2,6 +2,7 @@ Require Import interfaces.Category.
 Require Import oalts.AsyncEvents.
 Require Import oalts.Tree.
 From Paco Require Import paco.
+Require Import Setoid Morphisms.
 
 Module ALTS. (* <: Category. *)
   Import AsyncEvents.  
@@ -272,15 +273,51 @@ Module ALTS. (* <: Category. *)
     - eapply alts_sim_trans; eassumption.
   Qed.
 
+  Proposition alts_bisim_sim_fw {A : Type} (σ ρ : alts A) :
+    σ ≈ ρ -> σ ≲ ρ.
+  Proof.
+    intros [H _]. exact H.
+  Qed.
+
+  Proposition alts_bisim_sim_bw {A : Type} (σ ρ : alts A) :
+    σ ≈ ρ -> ρ ≲ σ.
+  Proof.
+    intros [_ H]. exact H.
+  Qed.
+
   Add Parametric Relation {A : Type} : (alts A) alts_sim
-  reflexivity proved by alts_sim_refl
-  transitivity proved by alts_sim_trans
-  as alts_sim_preorder.  
+    reflexivity proved by alts_sim_refl
+    transitivity proved by alts_sim_trans
+    as alts_sim_preorder.  
 
   Add Parametric Relation {A : Type} : (alts A) alts_bisim
     reflexivity proved by alts_bisim_refl
     symmetry proved by alts_bisim_sym
     transitivity proved by alts_bisim_trans
     as alts_bisim_equiv.
+
+  Add Parametric Morphism {A : Type} : (@alts_sim A)
+    with signature alts_bisim ==> alts_bisim ==> iff
+    as alts_sim_bisim_morphism.
+  Proof.
+    intros σ σ' Hσ τ τ' Hτ. split; intros H.
+    - transitivity σ. { apply alts_bisim_sim_bw. exact Hσ. }
+      transitivity τ. { exact H. }
+      apply alts_bisim_sim_fw. exact Hτ.
+    - transitivity σ'. { apply alts_bisim_sim_fw. exact Hσ. }
+      transitivity τ'. { exact H. }
+      apply alts_bisim_sim_bw. exact Hτ.
+  Qed.
+
+  (** Rewriting simulations inside simulation goals:
+      If σ ≲ σ' and τ' ≲ τ, then (σ' ≲ τ') -> (σ ≲ τ) *)
+  Add Parametric Morphism {A : Type} : (@alts_sim A)
+    with signature alts_sim ==> flip alts_sim ==> flip impl
+    as alts_sim_sim_morphism.
+  Proof.
+    intros σ σ' Hσ τ τ' Hτ H.
+    transitivity σ'; [exact Hσ |].
+    transitivity τ'; [exact H | exact Hτ].
+  Qed.
 
 End ALTS.
