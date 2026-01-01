@@ -244,14 +244,14 @@ Module Sig <: BicartesianCategory.
     [[A -o B] = (A^- && B^-) + (A^+ && B^+)]
 
     Left summand (inl) from [A^- && B^-] (input events):
-    - [inl ⟨a^- | b^-⟩]: A input synced with B input
-    - [inl ⟨a^- |⟩]: A input only
-    - [inl ⟨| b^-⟩]: B input only
+    - [neg ⟨a^- | b^-⟩]: A input synced with B input
+    - [neg ⟨a^- |⟩]: A input only
+    - [neg ⟨| b^-⟩]: B input only
 
     Right summand (inr) from [A^+ && B^+] (output events):
-    - [inr ⟨a^+ | b^+⟩]: A output synced with B output
-    - [inr ⟨a^+ |⟩]: A output only
-    - [inr ⟨| b^+⟩]: B output only
+    - [pos ⟨a^+ | b^+⟩]: A output synced with B output
+    - [pos ⟨a^+ |⟩]: A output only
+    - [pos ⟨| b^+⟩]: B output only
   *)
 
 
