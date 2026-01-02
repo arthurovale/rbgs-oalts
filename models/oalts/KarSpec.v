@@ -66,3 +66,23 @@ Proposition compose_assoc {A B C D : sig}
 Proof.
   apply compose_assoc.
 Qed.
+
+Open Scope oalts_scope.
+Definition lin {A : sig} {eA : idem A} 
+  (νA' : Spec eA) (νA : Spec eA) := (νA' ;; eA ≲ νA ;; eA)%alts.
+Close Scope oalts_scope.
+
+Notation "νA' ⊒ νA" := (lin νA' νA) (at level 70) : karspec_scope.
+
+Proposition lin_refl {A : sig} {eA : idem A} {νA : Spec eA} : νA ⊒ νA.
+Proof.
+  unfold lin. reflexivity.
+Qed.
+
+Proposition lin_trans {A : sig} {eA : idem A}
+  {νA'' : Spec eA} {νA' : Spec eA} {νA : Spec eA} :
+  νA'' ⊒ νA' -> νA' ⊒ νA -> νA'' ⊒ νA.
+Proof.
+  unfold lin. apply alts_sim_trans.
+Qed.
+
