@@ -73,12 +73,32 @@ Module KaroubiBase. (* <: Category *)
       (σ τ : idem_mor eA eB) : Prop :=
       (σ : oalts A B) ≲ (τ : oalts A B).
 
+    Lemma idem_mor_sim_intro {A B : sig} {eA : idem A} {eB : idem B}
+      {σ τ : idem_mor eA eB} :
+      (σ : oalts A B) ≲ (τ : oalts A B) -> idem_mor_sim σ τ.
+    Proof. auto. Qed.
+
+    Lemma idem_mor_sim_elim {A B : sig} {eA : idem A} {eB : idem B}
+      {σ τ : idem_mor eA eB} :
+      idem_mor_sim σ τ -> (σ : oalts A B) ≲ (τ : oalts A B).
+    Proof. auto. Qed.
+
     Notation "σ ≲ τ" := (idem_mor_sim σ τ).
 
     (** Bisimulation lifting: σ ≈ τ iff their carriers are bisimilar *)
     Definition idem_mor_bisim {A B : sig} {eA : idem A} {eB : idem B}
       (σ τ : idem_mor eA eB) : Prop :=
       (σ : oalts A B) ≈ (τ : oalts A B).
+      
+    Lemma idem_mor_bisim_intro {A B : sig} {eA : idem A} {eB : idem B}
+      {σ τ : idem_mor eA eB} :
+      (σ : oalts A B) ≈ (τ : oalts A B) -> idem_mor_bisim σ τ.
+    Proof. auto. Qed.
+
+    Lemma idem_mor_bisim_elim {A B : sig} {eA : idem A} {eB : idem B}
+      {σ τ : idem_mor eA eB} :
+      idem_mor_bisim σ τ -> (σ : oalts A B) ≈ (τ : oalts A B).
+    Proof. auto. Qed.
 
     Local Notation "σ ≈ τ" := (idem_mor_bisim σ τ).
 

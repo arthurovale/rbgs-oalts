@@ -20,6 +20,22 @@ Record impl {A B : sig} {eA : idem A} {eB : idem B}
 Arguments carrier_mor {A B} {eA eB} {νA νB}.
 Arguments impl_cond {A B} {eA eB} {νA νB}.
 
+Proposition impl_cond_by_obs_ref {A B : sig} {eA : idem A} {eB : idem B} 
+  {νA : Spec eA} {νB : Spec eB} (σ : idem_mor eA eB) :
+  ((νA ;; σ)%oalts ≲ (Kar νB : oalts _ _))%alts <-> 
+  Kar νA ;; σ ≲ Kar νB.
+Proof.
+  split.
+  - intros H. apply idem_mor_sim_intro. simpl. 
+    rewrite !OALTS.compose_assoc. rewrite OALTS.compose_id_right.
+    rewrite <- !OALTS.compose_assoc. rewrite (saturation_right σ). 
+    simpl in H. assumption.
+  - intros. apply idem_mor_sim_elim in H. simpl in H. 
+    rewrite OALTS.compose_assoc in H. rewrite OALTS.compose_id_right in H.
+    rewrite <- OALTS.compose_assoc in H. rewrite (saturation_right σ) in H.
+    exact H.
+Qed.
+
 Program Definition id {A : sig} {eA : idem A} (νA : Spec eA) : impl νA νA :=
   {|
     carrier_mor := Karoubi.id eA;
@@ -86,3 +102,30 @@ Proof.
   unfold lin. apply alts_sim_trans.
 Qed.
 
+Proposition lin_sim {A : sig} {eA : idem A} {νA' νA : Spec eA} :
+  (νA' ≲ (νA ;; eA)%oalts)%alts -> νA' ⊒ νA.
+Proof.
+  intros H. unfold lin. rewrite H. rewrite <- OALTS.compose_assoc.
+  rewrite (idempotency eA). reflexivity.
+Qed.
+
+Program Definition impl_conseq {A B : sig} {eA : idem A} {eB : idem B} 
+  {νA' νA : Spec eA} {νB νB' : Spec eB}  
+  (HA : νA' ⊒ νA) (HB : νB ⊒ νB') (σ : impl νA νB) : impl νA' νB' :=
+  {|
+    carrier_mor := σ;
+  |}.
+Next Obligation.
+  destruct σ as [σ H]. apply idem_mor_sim_intro. simpl.
+  unfold lin in *. rewrite HA. apply idem_mor_sim_elim in H. rewrite H.
+  simpl. rewrite !OALTS.compose_assoc. rewrite !OALTS.compose_id_right.
+  exact HB.
+Defined.
+
+Proposition impl_coseq_carrier_eq {A B : sig} {eA : idem A} {eB : idem B} 
+  {νA' νA : Spec eA} {νB νB' : Spec eB}  {HA : νA' ⊒ νA} {HB : νB ⊒ νB'} 
+  {σ : impl νA νB} : 
+  carrier_mor (impl_conseq HA HB σ) = σ.
+Proof.
+  reflexivity.
+Qed.
