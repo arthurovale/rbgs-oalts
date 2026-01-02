@@ -24,8 +24,8 @@ Definition cc_trans {A : sig}
   end.
 
 Definition cc (A : sig) : oalts A A :=
-    {|
-      states := @cc_state A;
-      start := cc_start;
-      trans := cc_trans;
-    |}.
+  {|
+    states := @cc_state A;
+    start := cc_start;
+    trans := cc_trans;
+  |}.
