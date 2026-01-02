@@ -357,13 +357,101 @@ Module OALTSBase. (* <: Category. *)
 
   Section Compose_Mon_L.
 
-    (* Helper: lift eps_star from τ' to compose τ' σ via right-only taus *)
     Definition compose_mon_l_rel {A B C : sig} {σ : oalts A B} {τ τ' : oalts B C}
+      (Rτ : states τ -> states τ' -> Prop)
       (s1 : states (compose τ σ)) (s2 : states (compose τ' σ)) : Prop :=
       exists s2' : states (compose τ' σ),
         eps_star (compose τ' σ) s2 s2' /\
         fst s1 = fst s2' /\
-        (snd s1) ≲'[τ, τ'] (snd s2').
+        Rτ (snd s1) (snd s2').
+
+    Lemma compose_mon_l_simF {A B C : sig} {σ : oalts A B} {τ τ' : oalts B C}
+      (Rτ : states τ -> states τ' -> Prop)
+      (HRτ : forall sτ sτ', Rτ sτ sτ' -> alts_simF τ τ' Rτ sτ sτ') :
+      forall s1 s2, compose_mon_l_rel_F Rτ s1 s2 ->
+        alts_simF (compose τ σ) (compose τ' σ) (compose_mon_l_rel_F Rτ) s1 s2.
+    Proof.
+      intros [sσ sτ] [sσ_c sτ'_c] [[sσ_s sτ'_s] [Hstar [Heqσ HR]]].
+      simpl in Heqσ, HR. subst sσ_s.
+      specialize (HRτ _ _ HR). destruct HRτ as [Hvis Heps]. split.
+      - (* Visible cases *)
+        intros ev [s2σ s2τ] Htrans.
+        destruct Htrans as [[evs [evt [Heqs [Hσ Hτ]]]] |
+                           [[evs [Heqs [Hσ Hτ]]] | [evt [Heqs [Hσ Hτ]]]]].
+        + (* Sync visible *)
+          specialize (Hvis evt s2τ Hτ). destruct Hvis as [s2τ' [Hwtrans Hsim']].
+          exists (s2σ, s2τ').
+          destruct Hwtrans as [sτ'_mid [Hstar_τ' Htrans_τ']].
+          split.
+          * exists (sσ, sτ'_mid). split.
+            -- eapply eps_star_trans; [exact Hstar |].
+               apply eps_star_compose_right. exact Hstar_τ'.
+            -- left. exists evs, evt. split; [exact Heqs |].
+               split; assumption.
+          * exists (s2σ, s2τ'). split; [constructor |].
+            split; [reflexivity | exact Hsim'].
+        + (* Left-only visible *)
+          simpl in Hτ. subst s2τ.
+          exists (s2σ, sτ'_s).
+          split.
+          * exists (sσ, sτ'_s). split; [exact Hstar |].
+            right. left. exists evs. split; [exact Heqs |].
+            split; [exact Hσ | reflexivity].
+          * exists (s2σ, sτ'_s). split; [constructor |].
+            split; [reflexivity | exact HR].
+        + (* Right-only visible *)
+          simpl in Hσ. subst s2σ.
+          destruct evt as [evt' | ].
+          * specialize (Hvis evt' s2τ Hτ). destruct Hvis as [s2τ' [Hwtrans Hsim']].
+            exists (sσ, s2τ').
+            destruct Hwtrans as [sτ'_mid [Hstar_τ' Htrans_τ']].
+            split.
+            -- exists (sσ, sτ'_mid). split.
+               ++ eapply eps_star_trans; [exact Hstar |].
+                  apply eps_star_compose_right. exact Hstar_τ'.
+               ++ right. right. exists ('evt'). split; [exact Heqs |].
+                  split; [reflexivity | exact Htrans_τ'].
+            -- exists (sσ, s2τ'). split; [constructor |].
+               split; [reflexivity | exact Hsim'].
+          * destruct Heqs as [_ [HprojL HprojR]]. simpl in HprojL, HprojR.
+            exfalso. eapply projL_projR_eps; [symmetry; exact HprojL | symmetry; exact HprojR].
+      - (* Tau cases *)
+        intros [s2σ s2τ] Htrans.
+        destruct Htrans as [[evs [evt [Heqs [Hσ Hτ]]]] |
+                           [[evs [Heqs [Hσ Hτ]]] | [evt [Heqs [Hσ Hτ]]]]].
+        + (* Sync tau: both σ and τ do visible steps that produce tau *)
+          specialize (Hvis evt s2τ Hτ). destruct Hvis as [s2τ' [Hwtrans Hsim']].
+          destruct Hwtrans as [sτ'_mid [Hstar_τ' Htrans_τ']].
+          exists (s2σ, s2τ'). split.
+          * eapply eps_star_trans; [exact Hstar |].
+            eapply eps_star_trans.
+            -- apply eps_star_compose_right. exact Hstar_τ'.
+            -- econstructor; [| constructor].
+               left. exists evs, evt. split; [exact Heqs |].
+               split; [exact Hσ | exact Htrans_τ'].
+          * split; [reflexivity | exact Hsim'].
+        + (* Left-only tau: σ does tau, τ stays *)
+          simpl in Hτ. subst s2τ.
+          exists (s2σ, sτ'_s). split.
+          * eapply eps_star_trans; [exact Hstar |].
+            econstructor; [| constructor].
+            right. left. exists evs. split; [exact Heqs |].
+            split; [exact Hσ | reflexivity].
+          * split; [reflexivity | exact HR].
+        + (* Right-only tau: τ does tau, σ stays *)
+          simpl in Hσ. symmetry in Hσ. subst s2σ.
+          destruct Heqs as [HprojL [_ HprojR]]. simpl in HprojL, HprojR.
+          destruct evt as [evt' |]; simpl in Hτ.
+          * (* evt' visible but projections are ε - contradiction *)
+            destruct evt' as [evtm | evtp];
+            [destruct evtm as [bm cm | bm | cm] | destruct evtp as [bp cp | bp | cp]];
+            simpl in HprojL, HprojR; try discriminate.
+          * (* evt = ε, τ does tau *)
+            specialize (Heps s2τ Hτ).
+            exists (sσ, sτ'_s). split.
+            -- exact Hstar.
+            -- split; [reflexivity | exact Heps].
+    Qed.
 
     Proposition compose_mon_l {A B C : sig} {σ : oalts A B} {τ τ' : oalts B C} :
       τ ≲ τ' -> compose τ σ ≲ compose τ' σ.
@@ -371,112 +459,10 @@ Module OALTSBase. (* <: Category. *)
       intros Hsim. intros [sσ sτ] [Hstartσ Hstartτ].
       specialize (Hsim sτ Hstartτ). destruct Hsim as [sτ' [Hstartτ' Hsim]].
       exists (sσ, sτ'). split. split; assumption.
-      apply (alts_sim_coind _ _ compose_mon_l_rel).
-      - clear Hstartσ Hstartτ Hstartτ' sσ Hsim sτ sτ'.
-        intros [sσ sτ] [sσ_c sτ'_c] [[sσ_s sτ'_s] [Hstar [Heqσ HR]]].
-        simpl in Heqσ, HR. subst sσ_s.
-        punfold HR. destruct HR as [Hvis Heps]. split.
-        + (* Visible cases *)
-          intros ev [s2σ s2τ] Htrans.
-          destruct Htrans as [[evs [evt [Heqs [Hσ Hτ]]]] |
-                             [[evs [Heqs [Hσ Hτ]]] | [evt [Heqs [Hσ Hτ]]]]].
-          * (* Sync visible *)
-            specialize (Hvis evt s2τ Hτ). destruct Hvis as [s2τ' [Hwtrans Hsim']].
-            exists (s2σ, s2τ').
-            destruct Hwtrans as [sτ'_mid [Hstar_τ' Htrans_τ']].
-            split.
-            -- exists (sσ, sτ'_mid). split.
-               ++ eapply eps_star_trans; [exact Hstar |].
-                  apply eps_star_compose_right. exact Hstar_τ'.
-               ++ left. exists evs, evt. split; [exact Heqs |].
-                  split; assumption.
-            -- exists (s2σ, s2τ'). split; [constructor |].
-               split; [reflexivity |]. simpl.
-               destruct Hsim' as [Hsim' | []]; exact Hsim'.
-          * (* Left-only visible *)
-            simpl in Hτ. subst s2τ.
-            exists (s2σ, sτ'_s).
-            split.
-            -- exists (sσ, sτ'_s). split; [exact Hstar |].
-               right. left. exists evs. split; [exact Heqs |].
-               split; [exact Hσ | reflexivity].
-            -- exists (s2σ, sτ'_s). split; [constructor |].
-               split; [reflexivity |]. simpl.
-               pfold. split.
-               ++ intros ev' s2' Htrans'. specialize (Hvis ev' s2' Htrans').
-                  destruct Hvis as [s2'' [Hweak HR']].
-                  exists s2''. split; [exact Hweak |].
-                  destruct HR' as [HR' | []]; left; exact HR'.
-               ++ intros s2' Htrans'. specialize (Heps s2' Htrans').
-                  destruct Heps as [Heps' | []]; left; exact Heps'.
-          * (* Right-only visible *)
-            simpl in Hσ. subst s2σ.
-            destruct evt as [evt' | ].
-            -- specialize (Hvis evt' s2τ Hτ). destruct Hvis as [s2τ' [Hwtrans Hsim']].
-               exists (sσ, s2τ').
-               destruct Hwtrans as [sτ'_mid [Hstar_τ' Htrans_τ']].
-               split.
-               ++ exists (sσ, sτ'_mid). split.
-                  ** eapply eps_star_trans; [exact Hstar |].
-                     apply eps_star_compose_right. exact Hstar_τ'.
-                  ** right. right. exists ('evt'). split; [exact Heqs |].
-                     split; [reflexivity | exact Htrans_τ'].
-               ++ exists (sσ, s2τ'). split; [constructor |].
-                  split; [reflexivity |]. simpl.
-                  destruct Hsim' as [Hsim' | []]; exact Hsim'.
-            -- destruct Heqs as [_ [HprojL HprojR]]. simpl in HprojL, HprojR.
-               exfalso. eapply projL_projR_eps; [symmetry; exact HprojL | symmetry; exact HprojR].
-        + (* Tau cases *)
-          intros [s2σ s2τ] Htrans.
-          destruct Htrans as [[evs [evt [Heqs [Hσ Hτ]]]] |
-                             [[evs [Heqs [Hσ Hτ]]] | [evt [Heqs [Hσ Hτ]]]]].
-          * (* Sync tau: both σ and τ do visible steps that produce tau *)
-            (* τ did visible 'evt, so we can use Hvis *)
-            specialize (Hvis evt s2τ Hτ). destruct Hvis as [s2τ' [Hwtrans Hsim']].
-            destruct Hwtrans as [sτ'_mid [Hstar_τ' Htrans_τ']].
-            (* compose τ' σ can catch up: eps_star to (sσ, sτ'_mid), then sync tau *)
-            exists (s2σ, s2τ'). split.
-            -- eapply eps_star_trans; [exact Hstar |].
-               eapply eps_star_trans.
-               ++ (* Right-only taus for τ' catching up *)
-                  apply eps_star_compose_right. exact Hstar_τ'.
-               ++ (* Sync tau step *)
-                  econstructor; [| constructor].
-                  left. exists evs, evt. split; [exact Heqs |].
-                  split; [exact Hσ | exact Htrans_τ'].
-            -- split; [reflexivity |]. simpl.
-               destruct Hsim' as [Hsim' | []]; exact Hsim'.
-          * (* Left-only tau: σ does tau, τ stays *)
-            simpl in Hτ. subst s2τ.
-            exists (s2σ, sτ'_s). split.
-            -- eapply eps_star_trans; [exact Hstar |].
-               econstructor; [| constructor].
-               right. left. exists evs. split; [exact Heqs |].
-               split; [exact Hσ | reflexivity].
-            -- split; [reflexivity |]. simpl.
-               pfold. split.
-               ++ intros ev' s2' Htrans'. specialize (Hvis ev' s2' Htrans').
-                  destruct Hvis as [s2'' [Hweak HR']].
-                  exists s2''. split; [exact Hweak |].
-                  destruct HR' as [HR' | []]; left; exact HR'.
-               ++ intros s2' Htrans'. specialize (Heps s2' Htrans').
-                  destruct Heps as [Heps' | []]; left; exact Heps'.
-          * (* Right-only tau: τ does tau, σ stays *)
-            simpl in Hσ. symmetry in Hσ. subst s2σ.
-            destruct Heqs as [HprojL [_ HprojR]]. simpl in HprojL, HprojR.
-            destruct evt as [evt' |]; simpl in Hτ.
-            -- (* evt' visible but projections are ε - contradiction *)
-               destruct evt' as [evtm | evtp];
-               [destruct evtm as [bm cm | bm | cm] | destruct evtp as [bp cp | bp | cp]];
-               simpl in HprojL, HprojR; try discriminate.
-            -- (* evt = ε, τ does tau *)
-               specialize (Heps s2τ Hτ).
-               exists (sσ, sτ'_s). split.
-               ++ exact Hstar.
-               ++ split; [reflexivity |]. simpl.
-                  destruct Heps as [Heps' | []]; exact Heps'.
-      - unfold compose_mon_l_rel.
-        exists (sσ, sτ'). split; [constructor |].
+      (* Instantiate with Rτ = alts_sim' τ τ' and use alts_sim_coind *)
+      apply (alts_sim_coind _ _ (compose_mon_l_rel_F (alts_sim' τ τ'))).
+      - apply compose_mon_l_simF. apply alts_sim'_simF.
+      - exists (sσ, sτ'). split; [constructor |].
         split; [reflexivity | exact Hsim].
     Qed.
 
@@ -484,13 +470,106 @@ Module OALTSBase. (* <: Category. *)
 
   Section Compose_Mon_R.
 
-    (* Relation for right monotonicity: σ' can catch up via eps_star *)
     Definition compose_mon_r_rel {A B C : sig} {σ σ' : oalts A B} {τ : oalts B C}
+      (Rσ : states σ -> states σ' -> Prop)
       (s1 : states (compose τ σ)) (s2 : states (compose τ σ')) : Prop :=
       exists s2' : states (compose τ σ'),
         eps_star (compose τ σ') s2 s2' /\
         snd s1 = snd s2' /\
-        (fst s1) ≲'[σ, σ'] (fst s2').
+        Rσ (fst s1) (fst s2').
+
+    Lemma compose_mon_r_simF {A B C : sig} {σ σ' : oalts A B} {τ : oalts B C}
+      (Rσ : states σ -> states σ' -> Prop)
+      (HRσ : forall sσ sσ', Rσ sσ sσ' -> alts_simF σ σ' Rσ sσ sσ') :
+      forall s1 s2, compose_mon_r_rel_F Rσ s1 s2 ->
+        alts_simF (compose τ σ) (compose τ σ') (compose_mon_r_rel_F Rσ) s1 s2.
+    Proof.
+      intros [sσ sτ] [sσ'_c sτ_c] [[sσ'_s sτ_s] [Hstar [Heqτ HR]]].
+      simpl in Heqτ, HR. subst sτ_s.
+      specialize (HRσ _ _ HR). destruct HRσ as [Hvis Heps]. split.
+      - (* Visible cases *)
+        intros ev [s2σ s2τ] Htrans.
+        destruct Htrans as [[evs [evt [Heqs [Hσ Hτ]]]] |
+                           [[evs [Heqs [Hσ Hτ]]] | [evt [Heqs [Hσ Hτ]]]]].
+        + (* Sync visible: both σ and τ do visible steps *)
+          specialize (Hvis evs s2σ Hσ). destruct Hvis as [s2σ' [Hwtrans Hsim']].
+          exists (s2σ', s2τ).
+          destruct Hwtrans as [sσ'_mid [Hstar_σ' Htrans_σ']].
+          split.
+          * exists (sσ'_mid, sτ). split.
+            -- eapply eps_star_trans; [exact Hstar |].
+               apply eps_star_compose_left. exact Hstar_σ'.
+            -- left. exists evs, evt. split; [exact Heqs |].
+               split; assumption.
+          * exists (s2σ', s2τ). split; [constructor |].
+            split; [reflexivity | exact Hsim'].
+        + (* Left-only visible: σ does visible step, τ stays *)
+          simpl in Hτ. subst s2τ.
+          destruct evs as [evs' | ].
+          * (* evs' visible *)
+            specialize (Hvis evs' s2σ Hσ). destruct Hvis as [s2σ' [Hwtrans Hsim']].
+            exists (s2σ', sτ).
+            destruct Hwtrans as [sσ'_mid [Hstar_σ' Htrans_σ']].
+            split.
+            -- exists (sσ'_mid, sτ). split.
+               ++ eapply eps_star_trans; [exact Hstar |].
+                  apply eps_star_compose_left. exact Hstar_σ'.
+               ++ right. left. exists ('evs'). split; [exact Heqs |].
+                  split; [exact Htrans_σ' | reflexivity].
+            -- exists (s2σ', sτ). split; [constructor |].
+               split; [reflexivity | exact Hsim'].
+          * (* evs = ε - contradiction since this produces visible ev *)
+            destruct Heqs as [_ [HprojL HprojR]]. simpl in HprojL, HprojR.
+            exfalso. eapply projL_projR_eps; [symmetry; exact HprojL | symmetry; exact HprojR].
+        + (* Right-only visible: τ does visible step, σ stays *)
+          simpl in Hσ. subst s2σ.
+          destruct evt as [evt' | ].
+          * exists (sσ'_s, s2τ).
+            split.
+            -- exists (sσ'_s, sτ). split; [exact Hstar |].
+               right. right. exists ('evt'). split; [exact Heqs |].
+               split; [reflexivity | exact Hτ].
+            -- exists (sσ'_s, s2τ). split; [constructor |].
+               split; [reflexivity | exact HR].
+          * destruct Heqs as [_ [HprojL HprojR]]. simpl in HprojL, HprojR.
+            exfalso. eapply projL_projR_eps; [symmetry; exact HprojL | symmetry; exact HprojR].
+      - (* Tau cases *)
+        intros [s2σ s2τ] Htrans.
+        destruct Htrans as [[evs [evt [Heqs [Hσ Hτ]]]] |
+                           [[evs [Heqs [Hσ Hτ]]] | [evt [Heqs [Hσ Hτ]]]]].
+        + (* Sync tau: both σ and τ do visible steps that produce tau *)
+          specialize (Hvis evs s2σ Hσ). destruct Hvis as [s2σ' [Hwtrans Hsim']].
+          destruct Hwtrans as [sσ'_mid [Hstar_σ' Htrans_σ']].
+          exists (s2σ', s2τ). split.
+          * eapply eps_star_trans; [exact Hstar |].
+            eapply eps_star_trans.
+            -- apply eps_star_compose_left. exact Hstar_σ'.
+            -- econstructor; [| constructor].
+               left. exists evs, evt. split; [exact Heqs |].
+               split; [exact Htrans_σ' | exact Hτ].
+          * split; [reflexivity | exact Hsim'].
+        + (* Left-only tau: σ does tau, τ stays *)
+          simpl in Hτ. subst s2τ.
+          destruct evs as [evs' |]; simpl in Hσ.
+          * (* evs' visible but projections are ε - contradiction *)
+            destruct Heqs as [HprojR [HprojL _]]. simpl in HprojL, HprojR.
+            destruct evs' as [evsm | evsp];
+            [destruct evsm as [am bm | am | bm] | destruct evsp as [ap bp | ap | bp]];
+            simpl in HprojL, HprojR; try discriminate.
+          * (* evs = ε, σ does tau *)
+            specialize (Heps s2σ Hσ).
+            exists (sσ'_s, sτ). split.
+            -- exact Hstar.
+            -- split; [reflexivity | exact Heps].
+        + (* Right-only tau: τ does tau, σ stays *)
+          simpl in Hσ. symmetry in Hσ. subst s2σ.
+          exists (sσ'_s, s2τ). split.
+          * eapply eps_star_trans; [exact Hstar |].
+            econstructor; [| constructor].
+            right. right. exists evt. split; [exact Heqs |].
+            split; [reflexivity | exact Hτ].
+          * split; [reflexivity | exact HR].
+    Qed.
 
     Proposition compose_mon_r {A B C : sig} {σ σ' : oalts A B} {τ : oalts B C} :
       σ ≲ σ' -> compose τ σ ≲ compose τ σ'.
@@ -498,113 +577,10 @@ Module OALTSBase. (* <: Category. *)
       intros Hsim. intros [sσ sτ] [Hstartσ Hstartτ].
       specialize (Hsim sσ Hstartσ). destruct Hsim as [sσ' [Hstartσ' Hsim]].
       exists (sσ', sτ). split. split; assumption.
-      apply (alts_sim_coind _ _ compose_mon_r_rel).
-      - clear Hstartσ Hstartτ Hstartσ' sτ Hsim sσ sσ'.
-        intros [sσ sτ] [sσ'_c sτ_c] [[sσ'_s sτ_s] [Hstar [Heqτ HR]]].
-        simpl in Heqτ, HR. subst sτ_s.
-        punfold HR. destruct HR as [Hvis Heps]. split.
-        + (* Visible cases *)
-          intros ev [s2σ s2τ] Htrans.
-          destruct Htrans as [[evs [evt [Heqs [Hσ Hτ]]]] |
-                             [[evs [Heqs [Hσ Hτ]]] | [evt [Heqs [Hσ Hτ]]]]].
-          * (* Sync visible: both σ and τ do visible steps *)
-            specialize (Hvis evs s2σ Hσ). destruct Hvis as [s2σ' [Hwtrans Hsim']].
-            exists (s2σ', s2τ).
-            destruct Hwtrans as [sσ'_mid [Hstar_σ' Htrans_σ']].
-            split.
-            -- exists (sσ'_mid, sτ). split.
-               ++ eapply eps_star_trans; [exact Hstar |].
-                  apply eps_star_compose_left. exact Hstar_σ'.
-               ++ left. exists evs, evt. split; [exact Heqs |].
-                  split; assumption.
-            -- exists (s2σ', s2τ). split; [constructor |].
-               split; [reflexivity |]. simpl.
-               destruct Hsim' as [Hsim' | []]; exact Hsim'.
-          * (* Left-only visible: σ does visible step, τ stays *)
-            simpl in Hτ. subst s2τ.
-            destruct evs as [evs' | ].
-            -- (* evs' visible *)
-               specialize (Hvis evs' s2σ Hσ). destruct Hvis as [s2σ' [Hwtrans Hsim']].
-               exists (s2σ', sτ).
-               destruct Hwtrans as [sσ'_mid [Hstar_σ' Htrans_σ']].
-               split.
-               ++ exists (sσ'_mid, sτ). split.
-                  ** eapply eps_star_trans; [exact Hstar |].
-                     apply eps_star_compose_left. exact Hstar_σ'.
-                  ** right. left. exists ('evs'). split; [exact Heqs |].
-                     split; [exact Htrans_σ' | reflexivity].
-               ++ exists (s2σ', sτ). split; [constructor |].
-                  split; [reflexivity |]. simpl.
-                  destruct Hsim' as [Hsim' | []]; exact Hsim'.
-            -- (* evs = ε - contradiction since this produces visible ev *)
-               destruct Heqs as [_ [HprojL HprojR]]. simpl in HprojL, HprojR.
-               exfalso. eapply projL_projR_eps; [symmetry; exact HprojL | symmetry; exact HprojR].
-          * (* Right-only visible: τ does visible step, σ stays *)
-            simpl in Hσ. subst s2σ.
-            destruct evt as [evt' | ].
-            -- exists (sσ'_s, s2τ).
-               split.
-               ++ exists (sσ'_s, sτ). split; [exact Hstar |].
-                  right. right. exists ('evt'). split; [exact Heqs |].
-                  split; [reflexivity | exact Hτ].
-               ++ exists (sσ'_s, s2τ). split; [constructor |].
-                  split; [reflexivity |]. simpl.
-                  pfold. split.
-                  ** intros ev' s2' Htrans'. specialize (Hvis ev' s2' Htrans').
-                     destruct Hvis as [s2'' [Hweak HR']].
-                     exists s2''. split; [exact Hweak |].
-                     destruct HR' as [HR' | []]; left; exact HR'.
-                  ** intros s2' Htrans'. specialize (Heps s2' Htrans').
-                     destruct Heps as [Heps' | []]; left; exact Heps'.
-            -- destruct Heqs as [_ [HprojL HprojR]]. simpl in HprojL, HprojR.
-               exfalso. eapply projL_projR_eps; [symmetry; exact HprojL | symmetry; exact HprojR].
-        + (* Tau cases *)
-          intros [s2σ s2τ] Htrans.
-          destruct Htrans as [[evs [evt [Heqs [Hσ Hτ]]]] |
-                             [[evs [Heqs [Hσ Hτ]]] | [evt [Heqs [Hσ Hτ]]]]].
-          * (* Sync tau: both σ and τ do visible steps that produce tau *)
-            specialize (Hvis evs s2σ Hσ). destruct Hvis as [s2σ' [Hwtrans Hsim']].
-            destruct Hwtrans as [sσ'_mid [Hstar_σ' Htrans_σ']].
-            exists (s2σ', s2τ). split.
-            -- eapply eps_star_trans; [exact Hstar |].
-               eapply eps_star_trans.
-               ++ apply eps_star_compose_left. exact Hstar_σ'.
-               ++ econstructor; [| constructor].
-                  left. exists evs, evt. split; [exact Heqs |].
-                  split; [exact Htrans_σ' | exact Hτ].
-            -- split; [reflexivity |]. simpl.
-               destruct Hsim' as [Hsim' | []]; exact Hsim'.
-          * (* Left-only tau: σ does tau, τ stays *)
-            simpl in Hτ. subst s2τ.
-            destruct evs as [evs' |]; simpl in Hσ.
-            -- (* evs' visible but projections are ε - contradiction *)
-               destruct Heqs as [HprojR [HprojL _]]. simpl in HprojL, HprojR.
-               destruct evs' as [evsm | evsp];
-               [destruct evsm as [am bm | am | bm] | destruct evsp as [ap bp | ap | bp]];
-               simpl in HprojL, HprojR; try discriminate.
-            -- (* evs = ε, σ does tau *)
-               specialize (Heps s2σ Hσ).
-               exists (sσ'_s, sτ). split.
-               ++ exact Hstar.
-               ++ split; [reflexivity |]. simpl.
-                  destruct Heps as [Heps' | []]; exact Heps'.
-          * (* Right-only tau: τ does tau, σ stays *)
-            simpl in Hσ. symmetry in Hσ. subst s2σ.
-            exists (sσ'_s, s2τ). split.
-            -- eapply eps_star_trans; [exact Hstar |].
-               econstructor; [| constructor].
-               right. right. exists evt. split; [exact Heqs |].
-               split; [reflexivity | exact Hτ].
-            -- split; [reflexivity |]. simpl.
-               pfold. split.
-               ++ intros ev' s2' Htrans'. specialize (Hvis ev' s2' Htrans').
-                  destruct Hvis as [s2'' [Hweak HR']].
-                  exists s2''. split; [exact Hweak |].
-                  destruct HR' as [HR' | []]; left; exact HR'.
-               ++ intros s2' Htrans'. specialize (Heps s2' Htrans').
-                  destruct Heps as [Heps' | []]; left; exact Heps'.
-      - unfold compose_mon_r_rel.
-        exists (sσ', sτ). split; [constructor |].
+      (* Instantiate with Rσ = alts_sim' σ σ' and use alts_sim_coind *)
+      apply (alts_sim_coind _ _ (compose_mon_r_rel_F (alts_sim' σ σ'))).
+      - apply compose_mon_r_simF. apply alts_sim'_simF.
+      - exists (sσ', sτ). split; [constructor |].
         split; [reflexivity | exact Hsim].
     Qed.
 
