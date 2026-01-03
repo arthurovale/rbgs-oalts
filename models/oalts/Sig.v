@@ -261,6 +261,9 @@ Module Sig <: BicartesianCategory.
   Notation "'neg' x" := (inl x) (at level 10, x at next level) : event_obj_scope.
   Notation "'pos' x" := (inr x) (at level 10, x at next level) : event_obj_scope.
   
+  Ltac destruct_lolli_event ev :=
+    destruct ev as [[?an ?bn | ?an | ?bn] | [?ap ?bp | ?ap | ?bp]].
+
   (** At this point, we can define projections of events of [A -o B] to 
     events of [A] and [B] *)
   Section Projections.
