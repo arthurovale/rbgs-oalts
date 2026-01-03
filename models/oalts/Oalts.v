@@ -20,7 +20,10 @@ Module OALTSBase. (* <: Category. *)
       start := fun s => start σ (fst s) /\ start τ (snd s);
       trans := fun s ev s' =>
         (exists evs evt,
-          (projR evs = projL evt /\ projL evs = ext projL ev /\ projR evt = ext projR ev) /\
+          (projR evs = projL evt /\ 
+           projR evs <> ɛ /\
+           projL evs = ext projL ev /\ 
+           projR evt = ext projR ev) /\
           (σ (fst s) ('evs) (fst s') /\ τ (snd s) ('evt) (snd s'))) \/
         (exists evs,
           (ext projR evs = ɛ /\ ext projL evs = ext projL ev /\ ɛ = ext projR ev) /\
@@ -69,8 +72,10 @@ Module OALTSBase. (* <: Category. *)
   End Compose_Aux.
 
   Ltac destruct_compose_trans H :=
-    destruct H as [[?evs [?evt [?Heqs [?Hσ ?Hτ]]]] |
-                  [[?evs [?Heqs [?Hσ ?Hτ]]] | [?evt [?Heqs [?Hσ ?Hτ]]]]].
+    destruct H as 
+      [[?evs [?evt [[?Heq_int [?Hint_vis [?HprojL ?HprojR]]] [?Hσ ?Hτ]]]] |
+      [[?evs [[?Heq_int [?HprojL ?HprojR]] [?Hσ ?Hτ]]] | 
+        [?evt [[?Heq_int [?HprojL ?HprojR]] [?Hσ ?Hτ]]]]].
 
   Section Id_Aux.
 
@@ -122,36 +127,35 @@ Module OALTSBase. (* <: Category. *)
           destruct_compose_trans Htrans.
           * (* Sync case: evs = ev via projections *)
             apply id_trans_iff in Hτ. destruct Hτ as [ev' [Heq Hproj]].
-            destruct Heqs as [Hmatch [HprojL HprojR]]. simpl in *.
-            injection Heq as Heq'. rewrite <- Heq' in Hproj.
-            rewrite (projL_ProjR_eq HprojL (eq_trans Hmatch (eq_trans Hproj HprojR))) in Hσ.
+            simpl in *. injection Heq as Heq'. rewrite <- Heq' in Hproj.
+            rewrite (projL_ProjR_eq HprojL (eq_trans Heq_int (eq_trans Hproj HprojR))) in Hσ.
             exact Hσ.
           * (* Left-only case *)
-            destruct Heqs as [HprojR [HprojL Heps]]. simpl in *.
-            destruct evs as [evs |]; [| exfalso; eapply projL_projR_eps; symmetry; [exact HprojL | exact Heps]].
-            simpl in HprojR. rewrite (projL_ProjR_eq HprojL (eq_trans HprojR Heps)) in Hσ. exact Hσ.
+            simpl in *. destruct evs as [evs |]; 
+            [| exfalso; eapply projL_projR_eps; symmetry; [exact HprojL | exact HprojR]].
+            simpl in Heq_int. rewrite (projL_ProjR_eq HprojL (eq_trans Heq_int HprojR)) in Hσ. exact Hσ.
           * (* Right-only case: contradiction *)
             apply id_trans_iff in Hτ. destruct Hτ as [ev' [Heq Hproj]].
-            rewrite Heq in Heqs. destruct Heqs as [HprojL _]. simpl in *.
-            rewrite <- HprojL in Hproj.
-            exfalso. eapply projL_projR_eps; symmetry; [exact HprojL | exact Hproj].
+            rewrite Heq in Heq_int, HprojR. simpl in *.
+            rewrite <- Heq_int in Hproj.
+            exfalso. eapply projL_projR_eps; symmetry; [exact Heq_int | exact Hproj].
         + split; [constructor | reflexivity].
       - (* Tau case: compose does s --ɛ--> t *)
         intros [t []] Htrans.
         destruct_compose_trans Htrans.
         + (* Sync: contradiction *)
           apply id_trans_iff in Hτ. destruct Hτ as [ev' [Heq Hproj]].
-          destruct Heqs as [Hmatch [HprojL HprojR]]. simpl in *.
-          injection Heq as Heq'. rewrite <- Heq' in Hproj. exfalso.
-          eapply projL_projR_eps; [exact HprojL | rewrite Hmatch, Hproj; exact HprojR].
+          simpl in *. injection Heq as Heq'. rewrite <- Heq' in Hproj. exfalso.
+          eapply projL_projR_eps; [exact HprojL | rewrite Heq_int, Hproj; exact HprojR].
         + (* Left-only: σ tau step *)
-          destruct Heqs as [HprojR [HprojL _]]. simpl in *.
-          destruct evs as [ev' |]; [exfalso; eapply projL_projR_eps; [exact HprojL | exact HprojR] |].
+          simpl in *. destruct evs as [ev' |]; 
+          [exfalso; eapply projL_projR_eps; [exact HprojL | exact Heq_int] |].
           simpl in Hσ. subst. split; [| reflexivity].
           eapply eps_star_trans; [exact Hstar | econstructor; [exact Hσ | constructor]].
         + (* Right-only: contradiction *)
-          destruct Heqs as [HprojL [_ HprojR]]. simpl in *.
-          destruct evt as [ev' |]; [exfalso; eapply projL_projR_eps; [symmetry; exact HprojL | exact HprojR] |].
+          simpl in *. destruct evt as [ev' |]; 
+          [exfalso; eapply projL_projR_eps; 
+          [symmetry; exact Heq_int | exact HprojR] |].
           simpl in Hτ. contradiction.
     Qed.
 
@@ -189,7 +193,9 @@ Module OALTSBase. (* <: Category. *)
               left. exists ev.
               destruct b as [bm | bp].
               ++ exists (neg ⟨bm | bm⟩). simpl. repeat split; auto.
+                 rewrite HprojR. discriminate.
               ++ exists (pos ⟨bp | bp⟩). simpl. repeat split; auto.
+                 rewrite HprojR. discriminate.
             -- (* No B component: σ-only *)
               right. left. exists ('ev). simpl. repeat split; auto.
         + (* Relation preserved: eps_star σ s1' s1' *)
@@ -244,36 +250,34 @@ Module OALTSBase. (* <: Category. *)
           destruct_compose_trans Htrans.
           * (* Sync case: evt = ev via projections *)
             apply id_trans_iff in Hσ. destruct Hσ as [ev' [Heq Hproj]].
-            destruct Heqs as [Hmatch [HprojL HprojR]]. simpl in *.
-            injection Heq as Heq'. rewrite <- Heq' in Hproj.
-            rewrite (projL_ProjR_eq (eq_trans (eq_sym Hmatch) (eq_trans (eq_sym Hproj) HprojL)) HprojR) in Hτ.
+            simpl in *. injection Heq as Heq'. rewrite <- Heq' in Hproj.
+            rewrite (projL_ProjR_eq (eq_trans (eq_sym Heq_int) (eq_trans (eq_sym Hproj) HprojL)) HprojR) in Hτ.
             exact Hτ.
           * (* Left-only case: contradiction *)
             apply id_trans_iff in Hσ. destruct Hσ as [ev' [Heq Hproj]].
-            rewrite Heq in Heqs. destruct Heqs as [HprojRε _]. simpl in *.
-            rewrite HprojRε in Hproj.
-            exfalso. eapply projL_projR_eps; [exact Hproj | exact HprojRε].
+            rewrite Heq in Heq_int, HprojL. simpl in *.
+            rewrite Heq_int in Hproj.
+            exfalso. eapply projL_projR_eps; [exact Hproj | exact Heq_int].
           * (* Right-only case *)
-            destruct Heqs as [HprojL [Heps HprojR]]. simpl in *.
-            destruct evt as [evt |]; [| exfalso; eapply projL_projR_eps; [symmetry; exact Heps | symmetry; exact HprojR]].
-            simpl in HprojL, HprojR.
-            rewrite (projL_ProjR_eq (eq_trans (eq_sym HprojL) Heps) HprojR) in Hτ. exact Hτ.
+            simpl in *.
+            destruct evt as [evt |]; [| exfalso; eapply projL_projR_eps; [symmetry; exact HprojL | symmetry; exact HprojR]].
+            simpl in Heq_int, HprojR.
+            rewrite (projL_ProjR_eq (eq_trans (eq_sym Heq_int) HprojL) HprojR) in Hτ. exact Hτ.
         + split; [constructor | reflexivity].
       - (* Tau case: compose does s --ɛ--> t *)
         intros [[] t] Htrans.
         destruct_compose_trans Htrans.
         + (* Sync: contradiction *)
           apply id_trans_iff in Hσ. destruct Hσ as [ev' [Heq Hproj]].
-          destruct Heqs as [Hmatch [HprojL HprojR]]. simpl in *.
-          injection Heq as Heq'. rewrite <- Heq' in Hproj. exfalso.
+          simpl in *. injection Heq as Heq'. rewrite <- Heq' in Hproj. exfalso.
           eapply projL_projR_eps; [exact HprojL | rewrite <- Hproj; exact HprojL].
         + (* Left-only: contradiction *)
-          destruct Heqs as [HprojR [HprojL _]]. simpl in *.
-          destruct evs as [ev' |]; [exfalso; eapply projL_projR_eps; [exact HprojL | exact HprojR] |].
+          simpl in *.
+          destruct evs as [ev' |]; [exfalso; eapply projL_projR_eps; [exact HprojL | exact Heq_int] |].
           contradiction.
         + (* Right-only: σ tau step *)
-          destruct Heqs as [HprojL [_ HprojR]]. simpl in *.
-          destruct evt as [ev' |]; [exfalso; eapply projL_projR_eps; [symmetry; exact HprojL | exact HprojR] |].
+          simpl in *.
+          destruct evt as [ev' |]; [exfalso; eapply projL_projR_eps; [symmetry; exact Heq_int | exact HprojR] |].
           simpl in Hσ. subst. split; [| reflexivity].
           eapply eps_star_trans; [exact Hstar | econstructor; [exact Hτ | constructor]].
     Qed.
@@ -311,8 +315,8 @@ Module OALTSBase. (* <: Category. *)
             -- (* A component: sync with id *)
                left.
                destruct a as [am | ap].
-               ++ exists (neg ⟨am | am⟩), ev. simpl. repeat split; auto.
-               ++ exists (pos ⟨ap | ap⟩), ev. simpl. repeat split; auto.
+               ++ exists (neg ⟨am | am⟩), ev. simpl. repeat split; auto. discriminate.
+               ++ exists (pos ⟨ap | ap⟩), ev. simpl. repeat split; auto. discriminate.
             -- (* No A component: σ-only *)
                right. right. exists ('ev). simpl. repeat split; auto.
         + (* Relation preserved: eps_star σ s1' s1' *)
@@ -385,7 +389,7 @@ Module OALTSBase. (* <: Category. *)
           * exists (sσ, sτ'_mid). split.
             -- eapply eps_star_trans; [exact Hstar |].
                apply eps_star_compose_right. exact Hstar_τ'.
-            -- left. exists evs, evt. split; [exact Heqs |].
+            -- left. exists evs, evt. split; [(repeat split; assumption) |].
                split; assumption.
           * exists (s2σ, s2τ'). split; [constructor |].
             split; [reflexivity | exact Hsim'].
@@ -394,7 +398,7 @@ Module OALTSBase. (* <: Category. *)
           exists (s2σ, sτ'_s).
           split.
           * exists (sσ, sτ'_s). split; [exact Hstar |].
-            right. left. exists evs. split; [exact Heqs |].
+            right. left. exists evs. split; [(repeat split; assumption) |].
             split; [exact Hσ | reflexivity].
           * exists (s2σ, sτ'_s). split; [constructor |].
             split; [reflexivity | exact HR].
@@ -408,11 +412,11 @@ Module OALTSBase. (* <: Category. *)
             -- exists (sσ, sτ'_mid). split.
                ++ eapply eps_star_trans; [exact Hstar |].
                   apply eps_star_compose_right. exact Hstar_τ'.
-               ++ right. right. exists ('evt'). split; [exact Heqs |].
+               ++ right. right. exists ('evt'). split; [(repeat split; assumption) |].
                   split; [reflexivity | exact Htrans_τ'].
             -- exists (sσ, s2τ'). split; [constructor |].
                split; [reflexivity | exact Hsim'].
-          * destruct Heqs as [_ [HprojL HprojR]]. simpl in HprojL, HprojR.
+          * simpl in HprojL, HprojR.
             exfalso. eapply projL_projR_eps; [symmetry; exact HprojL | symmetry; exact HprojR].
       - (* Tau cases *)
         intros [s2σ s2τ] Htrans.
@@ -425,7 +429,7 @@ Module OALTSBase. (* <: Category. *)
             eapply eps_star_trans.
             -- apply eps_star_compose_right. exact Hstar_τ'.
             -- econstructor; [| constructor].
-               left. exists evs, evt. split; [exact Heqs |].
+               left. exists evs, evt. split; [(repeat split; assumption) |].
                split; [exact Hσ | exact Htrans_τ'].
           * split; [reflexivity | exact Hsim'].
         + (* Left-only tau: σ does tau, τ stays *)
@@ -433,17 +437,17 @@ Module OALTSBase. (* <: Category. *)
           exists (s2σ, sτ'_s). split.
           * eapply eps_star_trans; [exact Hstar |].
             econstructor; [| constructor].
-            right. left. exists evs. split; [exact Heqs |].
+            right. left. exists evs. split; [(repeat split; assumption) |].
             split; [exact Hσ | reflexivity].
           * split; [reflexivity | exact HR].
         + (* Right-only tau: τ does tau, σ stays *)
           simpl in Hσ. symmetry in Hσ. subst s2σ.
-          destruct Heqs as [HprojL [_ HprojR]]. simpl in HprojL, HprojR.
+          simpl in Heq_int, HprojR.
           destruct evt as [evt' |]; simpl in Hτ.
           * (* evt' visible but projections are ε - contradiction *)
             destruct evt' as [evtm | evtp];
             [destruct evtm as [bm cm | bm | cm] | destruct evtp as [bp cp | bp | cp]];
-            simpl in HprojL, HprojR; try discriminate.
+            simpl in Heq_int, HprojR; try discriminate.
           * (* evt = ε, τ does tau *)
             specialize (Heps s2τ Hτ).
             exists (sσ, sτ'_s). split.
@@ -496,7 +500,7 @@ Module OALTSBase. (* <: Category. *)
           * exists (sσ'_mid, sτ). split.
             -- eapply eps_star_trans; [exact Hstar |].
                apply eps_star_compose_left. exact Hstar_σ'.
-            -- left. exists evs, evt. split; [exact Heqs |].
+            -- left. exists evs, evt. split; [(repeat split; assumption) |].
                split; assumption.
           * exists (s2σ', s2τ). split; [constructor |].
             split; [reflexivity | exact Hsim'].
@@ -511,12 +515,12 @@ Module OALTSBase. (* <: Category. *)
             -- exists (sσ'_mid, sτ). split.
                ++ eapply eps_star_trans; [exact Hstar |].
                   apply eps_star_compose_left. exact Hstar_σ'.
-               ++ right. left. exists ('evs'). split; [exact Heqs |].
+               ++ right. left. exists ('evs'). split; [(repeat split; assumption) |].
                   split; [exact Htrans_σ' | reflexivity].
             -- exists (s2σ', sτ). split; [constructor |].
                split; [reflexivity | exact Hsim'].
           * (* evs = ε - contradiction since this produces visible ev *)
-            destruct Heqs as [_ [HprojL HprojR]]. simpl in HprojL, HprojR.
+            simpl in HprojL, HprojR.
             exfalso. eapply projL_projR_eps; [symmetry; exact HprojL | symmetry; exact HprojR].
         + (* Right-only visible: τ does visible step, σ stays *)
           simpl in Hσ. subst s2σ.
@@ -524,11 +528,11 @@ Module OALTSBase. (* <: Category. *)
           * exists (sσ'_s, s2τ).
             split.
             -- exists (sσ'_s, sτ). split; [exact Hstar |].
-               right. right. exists ('evt'). split; [exact Heqs |].
+               right. right. exists ('evt'). split; [(repeat split; assumption) |].
                split; [reflexivity | exact Hτ].
             -- exists (sσ'_s, s2τ). split; [constructor |].
                split; [reflexivity | exact HR].
-          * destruct Heqs as [_ [HprojL HprojR]]. simpl in HprojL, HprojR.
+          * simpl in HprojL, HprojR.
             exfalso. eapply projL_projR_eps; [symmetry; exact HprojL | symmetry; exact HprojR].
       - (* Tau cases *)
         intros [s2σ s2τ] Htrans.
@@ -541,17 +545,17 @@ Module OALTSBase. (* <: Category. *)
             eapply eps_star_trans.
             -- apply eps_star_compose_left. exact Hstar_σ'.
             -- econstructor; [| constructor].
-               left. exists evs, evt. split; [exact Heqs |].
+               left. exists evs, evt. split; [(repeat split; assumption) |].
                split; [exact Htrans_σ' | exact Hτ].
           * split; [reflexivity | exact Hsim'].
         + (* Left-only tau: σ does tau, τ stays *)
           simpl in Hτ. subst s2τ.
           destruct evs as [evs' |]; simpl in Hσ.
           * (* evs' visible but projections are ε - contradiction *)
-            destruct Heqs as [HprojR [HprojL _]]. simpl in HprojL, HprojR.
+            simpl in HprojL, Heq_int.
             destruct evs' as [evsm | evsp];
             [destruct evsm as [am bm | am | bm] | destruct evsp as [ap bp | ap | bp]];
-            simpl in HprojL, HprojR; try discriminate.
+            simpl in HprojL, Heq_int; try discriminate.
           * (* evs = ε, σ does tau *)
             specialize (Heps s2σ Hσ).
             exists (sσ'_s, sτ). split.
@@ -562,7 +566,7 @@ Module OALTSBase. (* <: Category. *)
           exists (sσ'_s, s2τ). split.
           * eapply eps_star_trans; [exact Hstar |].
             econstructor; [| constructor].
-            right. right. exists evt. split; [exact Heqs |].
+            right. right. exists evt. split; [(repeat split; assumption) |].
             split; [reflexivity | exact Hτ].
           * split; [reflexivity | exact HR].
     Qed.
@@ -700,72 +704,68 @@ Module OALTS.
         + (* weak_trans on RHS *)
           apply StLess_weak_trans. simpl.
           (* Analyze the three cases from compose *)
-          destruct Htrans as [[evs [evt [[Hmatch [HprojL HprojR]] [Hσ Hτ]]]] |
-                              [[evs [[HprojRε [HprojL HprojRev]] [Hσ _]]] |
-                              [evt [[HprojLε [HprojLev HprojR]] [_ Hτ]]]]]; simpl in *.
+          destruct_compose_trans Htrans; simpl in *.
           * (* Sync case: both gen and gen' make visible transitions *)
             destruct evs as [evsm | evsp]; destruct evt as [evtm | evtp];
-            simpl in Hmatch.
+            simpl in Heq_int.
             -- (* Both negative: evsm and evtm *)
                 destruct evsm as [am bm | am | bm]; destruct evtm as [bm' cm | bm' | cm];
-                simpl in Hσ, Hτ, Hmatch; try contradiction; try discriminate;
+                simpl in Hσ, Hτ, Heq_int; try contradiction; try discriminate;
                 destruct ev as [evm | evp]; simpl in HprojL, HprojR;
                 try destruct evm as [am' cm' | am' | cm'];
                 try destruct evp as [ap' cp' | ap' | cp'];
                 simpl in HprojL, HprojR; try discriminate;
-                inversion Hmatch; subst; inversion HprojL; subst; inversion HprojR; subst;
+                inversion Heq_int; subst; inversion HprojL; subst; inversion HprojR; subst;
                 simpl; unfold Sig.compose; simpl; unfold AsyncEventsBase.compose;
                 try (rewrite Hσ; exact Hτ); try (rewrite Hσ; simpl; exact Hτ).
             -- (* evsm negative, evtp positive: impossible by type *)
                 destruct evsm as [am bm | am | bm]; destruct evtp as [bp' cp | bp' | cp];
-                simpl in Hσ, Hτ, Hmatch; try contradiction; try discriminate.
+                simpl in Hσ, Hτ, Heq_int; try contradiction; try discriminate.
             -- (* evsp positive, evtm negative: impossible by type *)
                 destruct evsp as [ap bp | ap | bp]; destruct evtm as [bm' cm | bm' | cm];
-                simpl in Hσ, Hτ, Hmatch; try contradiction; try discriminate.
+                simpl in Hσ, Hτ, Heq_int; try contradiction; try discriminate.
             -- (* Both positive: evsp and evtp *)
                 destruct evsp as [ap bp | ap | bp]; destruct evtp as [bp' cp | bp' | cp];
-                simpl in Hσ, Hτ, Hmatch; try contradiction; try discriminate;
+                simpl in Hσ, Hτ, Heq_int; try contradiction; try discriminate;
                 destruct ev as [evm | evp]; simpl in HprojL, HprojR;
                 try destruct evm as [am' cm' | am' | cm'];
                 try destruct evp as [ap' cp' | ap' | cp'];
                 simpl in HprojL, HprojR; try discriminate;
-                inversion Hmatch; subst; inversion HprojL; subst; inversion HprojR; subst;
+                inversion Heq_int; subst; inversion HprojL; subst; inversion HprojR; subst;
                 simpl; unfold Sig.compose; simpl; unfold AsyncEventsBase.compose;
                 try (rewrite Hσ; exact Hτ); try (rewrite Hσ; simpl; exact Hτ).
           * (* Left-only case: only gen makes a transition *)
-            destruct evs as [evs' | ]; simpl in HprojRε, Hσ; try contradiction.
+            destruct evs as [evs' | ]; simpl in Heq_int, Hσ; try contradiction.
             destruct evs' as [evsm | evsp].
             -- destruct evsm as [am bm | am | bm];
-                simpl in HprojRε, Hσ; try discriminate; try contradiction;
+                simpl in Heq_int, Hσ; try discriminate; try contradiction;
                 destruct ev as [evm | evp];
                 try destruct evm as [am' cm' | am' | cm'];
                 try destruct evp as [ap' cp' | ap' | cp'];
-                simpl in HprojL, HprojRev; try discriminate;
+                simpl in HprojL, HprojR; try discriminate;
                 inversion HprojL; subst;
                 simpl; unfold Sig.compose; simpl; unfold AsyncEventsBase.compose;
                 rewrite Hσ; reflexivity.
             -- destruct evsp as [ap bp | ap | bp];
-                simpl in HprojRε, Hσ; try discriminate; try contradiction;
+                simpl in Heq_int, Hσ; try discriminate; try contradiction;
                 destruct ev as [evm | evp];
                 try destruct evm as [am' cm' | am' | cm'];
                 try destruct evp as [ap' cp' | ap' | cp'];
-                simpl in HprojL, HprojRev; try discriminate;
+                simpl in HprojL, HprojR; try discriminate;
                 inversion HprojL; subst;
                 simpl; unfold Sig.compose; simpl; unfold AsyncEventsBase.compose;
                 rewrite Hσ; reflexivity.
           * (* Right-only case: only gen' makes a transition - impossible *)
-            destruct evt as [evt' | ]; simpl in Hτ, HprojLε; try contradiction.
+            destruct evt as [evt' | ]; simpl in Hτ, HprojL; try contradiction.
             destruct evt' as [evtm | evtp].
             -- destruct evtm as [bm cm | bm | cm];
-                simpl in Hτ, HprojLε; try discriminate; try contradiction.
+                simpl in Hτ, HprojL; try discriminate; try contradiction.
             -- destruct evtp as [bp cp | bp | cp];
-                simpl in Hτ, HprojLε; try discriminate; try contradiction.
+                simpl in Hτ, HprojL; try discriminate; try contradiction.
         + right. apply IH.
       - (* Tau transitions - compose of StLess has no real tau transitions *)
         intros [[] []] Htrans. simpl in Htrans.
-        destruct Htrans as [[evs [evt [[_ [HprojL _]] [Hσ _]]]] |
-                            [[evs [[_ [HprojL _]] [Hσ _]]] |
-                            [evt [[HprojL _] [_ Hτ]]]]]; simpl in *.
+        destruct_compose_trans Htrans.
         + (* Sync case: projL evs = ɛ, but StLess only has transitions on
               events where projL is visible *)
           destruct evs as [evsm | evsp]; simpl in HprojL;
@@ -804,7 +804,7 @@ Module OALTS.
                 destruct (gen^- am) as [bm |] eqn:Hgen; simpl in Htrans.
                 ++ (* gen^- am = 'bm, gen'^- bm = 'cm *)
                   left. exists (neg ⟨am | bm⟩), (neg ⟨bm | cm⟩).
-                  simpl. repeat split; auto.
+                  simpl. repeat split; auto. discriminate.
                 ++ discriminate Htrans.
             -- (* ev = neg ⟨am |⟩ : (gen' @ gen)^- am = ɛ *)
                 unfold Sig.compose in Htrans. simpl in Htrans.
@@ -812,7 +812,7 @@ Module OALTS.
                 destruct (gen^- am) as [bm |] eqn:Hgen; simpl in Htrans.
                 ++ (* gen^- am = 'bm, gen'^- bm = ɛ *)
                   left. exists (neg ⟨am | bm⟩), (neg ⟨bm |⟩).
-                  simpl. repeat split; auto.
+                  simpl. repeat split; auto. discriminate.
                 ++ (* gen^- am = ɛ *)
                   right. left. exists ('neg ⟨am |⟩).
                   simpl. repeat split; auto.
@@ -824,13 +824,14 @@ Module OALTS.
                 destruct (gen^+ ap) as [bp |] eqn:Hgen; simpl in Htrans.
                 ++ left. exists (pos ⟨ap | bp⟩), (pos ⟨bp | cp⟩).
                   simpl. repeat split; auto.
+                  discriminate.
                 ++ discriminate Htrans.
             -- (* ev = pos ⟨ap |⟩ : (gen' @ gen)^+ ap = ɛ *)
                 unfold Sig.compose in Htrans. simpl in Htrans.
                 unfold AsyncEventsBase.compose in Htrans.
                 destruct (gen^+ ap) as [bp |] eqn:Hgen; simpl in Htrans.
                 ++ left. exists (pos ⟨ap | bp⟩), (pos ⟨bp |⟩).
-                  simpl. repeat split; auto.
+                  simpl. repeat split; auto. discriminate.
                 ++ right. left. exists ('pos ⟨ap |⟩).
                   simpl. repeat split; auto.
         + right. apply IH.
