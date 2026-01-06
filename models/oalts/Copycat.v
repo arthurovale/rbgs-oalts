@@ -231,13 +231,128 @@ Section Idempotence.
       * exfalso. apply (cc_no_eps _ _ Hτ).
   Qed.
 
-Proposition cc_idempotence {A : sig} : cc A ;; cc A ≈ cc A.
-Proof.
-  split.
-  - intros [s_l s_r] [Hstart_l Hstart_r].
-    simpl in Hstart_l, Hstart_r. unfold cc_start in Hstart_l, Hstart_r. subst.
-    exists []. split; [reflexivity |].
-    apply (alts_sim_coind (cc A ;; cc A) (cc A) cc_idem_rel cc_idem_fw).
-    exists ([], []). split; [constructor |]. simpl. reflexivity.
-  - admit.
-Admitted.
+  Definition cc_idem_rel_bw {A : sig}
+    (s : @cc_state A) (sc : @cc_state A * @cc_state A) : Prop :=
+    Permutation s (fst sc ++ snd sc).
+
+  Proposition cc_idem_bw {A : sig} :
+    forall s1 sc1, cc_idem_rel_bw s1 sc1 ->
+      alts_simF (cc A) (cc A ;; cc A) cc_idem_rel_bw s1 sc1.
+  Proof.
+    intros s1 [s_l s_r] Hperm. simpl in *.
+    split.
+    - (* Visible: cc A does visible, cc;;cc must match *)
+      intros ev s2 Htrans.
+      inversion Htrans; subst.
+      + (* cc_recv_neg: s1 --'neg ⟨|an⟩--> neg an :: s1 *)
+        (* Right cc receives: (s_l, s_r) -> (s_l, neg an :: s_r) *)
+        exists (s_l, neg an :: s_r). split.
+        * exists (s_l, s_r). split; [constructor |].
+          right. right. exists ('neg ⟨ | an ⟩). simpl.
+          repeat split; try reflexivity. constructor.
+        * unfold cc_idem_rel_bw in *. simpl in Hperm. simpl.
+          rewrite Hperm. apply Permutation_middle.
+      + (* cc_send_neg: need to find neg an and send from left *)
+        (* This requires showing neg an can be moved to s_l if needed *)
+        assert (Hin : In (neg an) (s_l ++ s_r)).
+        { apply Permutation_in with (s0 ++ neg an :: s3).
+          - exact Hperm.
+          - apply in_or_app. right. left. reflexivity. }
+        apply in_app_or in Hin. destruct Hin as [Hin | Hin];
+        apply in_split in Hin as [l1 [l2 Hsplit]].
+        * exists (l1 ++ l2, s_r). split.
+          -- exists (s_l, s_r); split; [constructor|].
+             right. left. exists ('neg ⟨ an | ⟩). simpl.
+             repeat split; try reflexivity.
+             rewrite Hsplit. constructor.
+          -- unfold cc_idem_rel_bw in *; simpl; simpl in Hperm.
+             rewrite Hsplit in Hperm.
+             eapply Permutation_cons_app_inv. etransitivity.
+             eapply Permutation_middle. etransitivity.
+             apply Hperm. rewrite <- !app_assoc. 
+             apply Permutation_app_head. apply Permutation_middle.
+        * exists (s_l, l1 ++ l2). split.
+          -- exists (neg an :: s_l, l1 ++ l2); split.
+             ++ econstructor; [| constructor].
+                left. exists (neg ⟨ | an ⟩), (neg ⟨ an | ⟩). simpl.
+                repeat split; try reflexivity; try discriminate.
+                constructor. rewrite Hsplit. constructor.
+             ++ right. left. exists ('neg ⟨ an | ⟩). simpl.
+                repeat split; try reflexivity.
+                apply (cc_send_neg [] s_l an).
+          -- unfold cc_idem_rel_bw in *; simpl in Hperm; simpl.
+             rewrite Hsplit in Hperm.
+             eapply Permutation_cons_app_inv. etransitivity.
+             eapply Permutation_middle. etransitivity.
+             apply Hperm. apply Permutation_app_head.
+             symmetry. apply Permutation_middle.
+      + (* cc_recv_pos: s1 --'pos ⟨ap|⟩--> pos ap :: s1 *)
+        (* Left cc receives: (s_l, s_r) -> (pos ap :: s_l, s_r) *)
+        exists (pos ap :: s_l, s_r). split.
+        * exists (s_l, s_r). split; [constructor |].
+          right. left. exists ('pos ⟨ ap | ⟩). simpl.
+          repeat split; try reflexivity. constructor.
+        * simpl.
+          apply perm_skip. exact Hperm.
+      + (* cc_send_pos: need to find pos ap and send from right *)
+        assert (Hin : In (pos ap) (s_l ++ s_r)).
+        { apply Permutation_in with (s0 ++ pos ap :: s3).
+          - exact Hperm.
+          - apply in_or_app. right. left. reflexivity. }
+        apply in_app_or in Hin. destruct Hin as [Hin | Hin];
+        apply in_split in Hin as [l1 [l2 Hsplit]].
+        * exists (l1 ++ l2, s_r). split.
+          -- exists (l1 ++ l2, pos ap :: s_r); split.
+             ++ econstructor; [| constructor].
+                left. exists (pos ⟨ | ap ⟩), (pos ⟨ ap | ⟩). simpl.
+                repeat split; try reflexivity; try discriminate.
+                rewrite Hsplit. constructor. constructor.
+             ++ right. right. exists ('pos ⟨ | ap ⟩). simpl.
+                repeat split; try reflexivity.
+                apply (cc_send_pos [] s_r ap).
+          -- unfold cc_idem_rel_bw in *; simpl in Hperm; simpl.
+             rewrite Hsplit in Hperm.
+             eapply Permutation_cons_app_inv. etransitivity.
+             eapply Permutation_middle. etransitivity. 
+             apply Hperm. rewrite <- !app_assoc.
+             apply Permutation_app_head. apply Permutation_middle.
+        * exists (s_l, l1 ++ l2). split.
+          -- exists (s_l, s_r); split; [constructor|].
+             right. right. exists ('pos ⟨ | ap ⟩). simpl.
+             repeat split; try reflexivity.
+             rewrite Hsplit. constructor.
+          -- unfold cc_idem_rel_bw in *; simpl; simpl in Hperm.
+             rewrite Hsplit in Hperm.
+             eapply Permutation_cons_app_inv. etransitivity.
+             eapply Permutation_middle. etransitivity.
+             apply Hperm. apply Permutation_app_head. 
+             symmetry. apply Permutation_middle.
+    - (* Tau: cc A has no eps transitions *)
+      intros s2 Htrans. exfalso. apply (cc_no_eps _ _ Htrans).
+  Qed.
+
+  Proposition cc_idempotence {A : sig} : cc A ;; cc A ≈ cc A.
+  Proof.
+    split.
+    - (* Forward: cc;;cc ≲ cc *)
+      intros [s_l s_r] [Hstart_l Hstart_r].
+      simpl in Hstart_l, Hstart_r. unfold cc_start in Hstart_l, Hstart_r. subst.
+      exists []. split; [reflexivity |].
+      apply (alts_sim_coind (cc A ;; cc A) (cc A) cc_idem_rel cc_idem_fw).
+      exists ([], []). split; [constructor |]. simpl. reflexivity.
+    - (* Backward: cc ≲ cc;;cc *)
+      intros s Hstart. simpl in Hstart. unfold cc_start in Hstart. subst.
+      exists ([], []). split; [split; reflexivity |].
+      apply (alts_sim_coind (cc A) (cc A ;; cc A) cc_idem_rel_bw cc_idem_bw).
+      unfold cc_idem_rel_bw. reflexivity.
+  Qed.
+
+End Idempotence.
+
+Import Karoubi.
+
+Definition cc_idem (A : sig) : idem A := 
+  {|
+    carrier := cc A;
+    idempotence := cc_idempotence;
+  |}.
