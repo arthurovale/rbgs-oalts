@@ -7,10 +7,10 @@ Module KaroubiBase. (* <: Category *)
 
   Record idem (A : sig) : Type := {
     carrier :> oalts A A;
-    idempotency : carrier ;; carrier ≈ carrier;
+    idempotence : carrier ;; carrier ≈ carrier;
   }.
   Arguments carrier {A}. 
-  Arguments idempotency {A}.
+  Arguments idempotence {A}.
 
   Program Definition id_idem (A : sig) : idem A := {|
     carrier := OALTS.id A;
@@ -30,7 +30,7 @@ Module KaroubiBase. (* <: Category *)
     forall (σ : idem_mor eA eB), eB @ σ ≈ (σ : oalts A B).
   Proof.
     intros σ. rewrite <- (saturation σ) at 1.
-    rewrite <- !OALTS.compose_assoc. rewrite (idempotency eB).
+    rewrite <- !OALTS.compose_assoc. rewrite (idempotence eB).
     exact (saturation σ).
   Qed.
 
@@ -38,7 +38,7 @@ Module KaroubiBase. (* <: Category *)
     forall (σ : idem_mor eA eB), σ @ eA ≈ (σ : oalts A B).
   Proof.
     intros σ. rewrite <- (saturation σ) at 1.
-    rewrite !OALTS.compose_assoc. rewrite (idempotency eA).
+    rewrite !OALTS.compose_assoc. rewrite (idempotence eA).
     rewrite <- !OALTS.compose_assoc. exact (saturation σ).
   Qed.
 
@@ -46,7 +46,7 @@ Module KaroubiBase. (* <: Category *)
     carrier_mor := e;
   |}.
   Next Obligation.
-    rewrite !idempotency. reflexivity.
+    rewrite !idempotence. reflexivity.
   Defined.
 
   Program Definition compose {A B C : sig} {eA : idem A} {eB : idem B} {eC : idem C}
@@ -258,8 +258,8 @@ Module KarOp.
   Program Definition K {A B : sig} (eA : idem A) (eB : idem B) (σ : oalts A B) :
     idem_mor eA eB := {| carrier_mor := eA ;; σ ;; eB |}.
   Next Obligation.
-    rewrite !OALTS.compose_assoc. rewrite (idempotency eA).
-    rewrite <- !OALTS.compose_assoc. rewrite (idempotency eB).
+    rewrite !OALTS.compose_assoc. rewrite (idempotence eA).
+    rewrite <- !OALTS.compose_assoc. rewrite (idempotence eB).
     reflexivity.
   Defined.
 
@@ -277,15 +277,15 @@ Module KarOp.
     K e e (OALTS.id A) ≈ id e.
   Proof.
     unfold idem_mor_bisim; simpl. rewrite OALTS.compose_id_right.
-    apply (idempotency e).
+    apply (idempotence e).
   Qed.
 
   Proposition K_idempotent {A B : sig} {eA : idem A} {eB : idem B} :
     forall σ, K eA eB (K eA eB σ) ≈ K eA eB σ.
   Proof.
     intros σ. unfold idem_mor_bisim; simpl.
-    rewrite !OALTS.compose_assoc. rewrite (idempotency eA).
-    rewrite <- !OALTS.compose_assoc. rewrite (idempotency eB).
+    rewrite !OALTS.compose_assoc. rewrite (idempotence eA).
+    rewrite <- !OALTS.compose_assoc. rewrite (idempotence eB).
     reflexivity.
   Qed.
 

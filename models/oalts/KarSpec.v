@@ -106,7 +106,7 @@ Proposition lin_sim {A : sig} {eA : idem A} {νA' νA : Spec eA} :
   (νA' ≲ (νA ;; eA)%oalts)%alts -> νA' ⊒ νA.
 Proof.
   intros H. unfold lin. rewrite H. rewrite <- OALTS.compose_assoc.
-  rewrite (idempotency eA). reflexivity.
+  rewrite (idempotence eA). reflexivity.
 Qed.
 
 Program Definition impl_conseq {A B : sig} {eA : idem A} {eB : idem B} 
